@@ -5,12 +5,12 @@
 // throws if analytics is blocked (ad blockers, offline, no consent yet) —
 // it just becomes a no-op.
 
-const MEASUREMENT_ID = "G-XXXXXXXXXX";
+const MEASUREMENT_ID = "G-4PL86Q2VHV";
 let initialized = false;
 
 export function initAnalytics() {
   if (initialized || typeof window === "undefined") return;
-  
+
   const script = document.createElement("script");
   script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
   script.async = true;
