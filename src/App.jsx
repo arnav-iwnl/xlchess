@@ -1,7 +1,6 @@
 import { useEffect, useState, lazy, Suspense, useRef } from "react";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
-import { initAnalytics } from "./lib/analytics";
 
 const FamousGames = lazy(() => import("./components/FamousGames"));
 const PlayStockfish = lazy(() => import("./components/PlayStockfish"));
@@ -46,13 +45,13 @@ export default function App() {
             <FamousGames />
           </Suspense>
         </LazySection>
-        
+
         <LazySection minHeight="800px">
           <Suspense fallback={<div className="h-[800px]" />}>
             <PlayStockfish />
           </Suspense>
         </LazySection>
-        
+
         <LazySection minHeight="400px">
           <Suspense fallback={null}>
             <Testimonials />
