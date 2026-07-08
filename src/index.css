@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b1024;
+  --color-ink-2: #121a3a;
+  --color-ink-3: #1b2550;
+  --color-violet: #8b7bf0;
+  --color-violet-2: #b6a9ff;
+  --color-board-dark: #6f9150;
+  --color-board-light: #eef1d8;
+  --color-gold: #e0b039;
+  --color-paper: #f5f4ef;
+  --color-mist: #9aa3c7;
+  --color-line: rgba(182, 169, 255, 0.14);
+
+  --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  /* Backward compatibility for global CSS */
+  --ink: #0b1024;
+  --ink-2: #121a3a;
+  --ink-3: #1b2550;
+  --violet: #8b7bf0;
+  --violet-2: #b6a9ff;
+  --board-dark: #6f9150;
+  --board-light: #eef1d8;
+  --gold: #e0b039;
+  --paper: #f5f4ef;
+  --mist: #9aa3c7;
+  --line: rgba(182, 169, 255, 0.14);
+  --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  margin: 0;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--violet-2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: var(--violet-2);
+  display: inline-block;
+}
+
+/* Visible keyboard focus, everywhere */
+:focus-visible {
+  outline: 2px solid var(--violet-2);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Skip link for keyboard/screen-reader users */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--violet);
+  color: var(--ink);
+  padding: 10px 16px;
+  z-index: 1000;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+.btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--violet), #6f5be0);
+  color: #fff;
+  padding: 14px 26px;
+  box-shadow: 0 8px 24px rgba(139, 123, 240, 0.35);
+}
+.btn-primary:hover {
+  box-shadow: 0 10px 30px rgba(139, 123, 240, 0.5);
+  transform: translateY(-1px);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid var(--line);
+  padding: 13px 22px;
+}
+.btn-ghost:hover {
+  border-color: var(--violet-2);
+  background: rgba(139, 123, 240, 0.08);
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--mist);
+  letter-spacing: 0.08em;
+}
+
+/* coordinate strip motif — reused as a structural device across sections */
+.coord-strip {
+  display: flex;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--mist);
+  letter-spacing: 0.3em;
+  opacity: 0.55;
+}
