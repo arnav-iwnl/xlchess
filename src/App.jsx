@@ -15,7 +15,7 @@ export default function App() {
 
   useEffect(() => {
     initAnalytics();
-    const t = setTimeout(() => setLoading(false), 1200);
+    const t = setTimeout(() => setLoading(false), 0);
     return () => clearTimeout(t);
   }, []);
 
