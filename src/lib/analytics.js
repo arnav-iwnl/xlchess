@@ -10,6 +10,12 @@ let initialized = false;
 
 export function initAnalytics() {
   if (initialized || typeof window === "undefined") return;
+  
+  const script = document.createElement("script");
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
+  script.async = true;
+  document.head.appendChild(script);
+
   window.dataLayer = window.dataLayer || [];
   // eslint-disable-next-line no-inner-declarations
   function gtag() {

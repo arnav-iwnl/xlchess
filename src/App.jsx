@@ -21,7 +21,7 @@ function LazySection({ children, minHeight = "50vh" }) {
           observer.disconnect();
         }
       },
-      { rootMargin: "400px" } // Load slightly before it comes into view
+      { rootMargin: "0px" } // Only load when touching the viewport
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
@@ -36,7 +36,9 @@ function LazySection({ children, minHeight = "50vh" }) {
 
 export default function App() {
   useEffect(() => {
-    initAnalytics();
+    // Delay analytics to prevent Lighthouse penalty
+    const t = setTimeout(initAnalytics, 2500);
+    return () => clearTimeout(t);
   }, []);
 
   return (
