@@ -62,12 +62,7 @@ export default function Hero() {
   return (
     <section id="top" className="relative py-[64px] pb-[96px] bg-[radial-gradient(ellipse_900px_500px_at_15%_-10%,rgba(139,123,240,0.22),transparent_60%),radial-gradient(ellipse_700px_500px_at_90%_10%,rgba(182,169,255,0.12),transparent_60%)] max-[520px]:py-[40px] max-[520px]:pb-[64px]">
       <div className="container grid grid-cols-[1.05fr_0.95fr] gap-[56px] items-center max-[980px]:grid-cols-1 max-[980px]:gap-[40px]">
-        <motion.div
-          className="flex flex-col"
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-        >
+        <div className="flex flex-col">
           <p className="eyebrow">Play · Learn · Compete</p>
           <h1 className="mt-[24px] text-[clamp(1.9rem,7vw,3.6rem)] font-bold text-paper leading-[1.1] tracking-[-0.01em]">
             Build the Future of
@@ -89,7 +84,7 @@ export default function Hero() {
           <p className="mt-[24px] font-mono py-[9px] text-[0.68rem] sm:text-[0.76rem] text-mist tracking-[0.01em]">
             3 legendary games to replay · Stockfish opponent, 5 difficulty levels · Free, no signup to play
           </p>
-        </motion.div>
+        </div>
 
         <motion.div
           className="bg-ink-2 border border-ink-3 rounded-[18px] p-[18px]"
