@@ -69,13 +69,13 @@ export default function Hero() {
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <p className="eyebrow">Play · Learn · Compete</p>
-          <h1 className="mt-[24px] text-[clamp(2.4rem,5vw,3.6rem)] font-bold text-paper leading-[1.1] tracking-[-0.01em]">
+          <h1 className="mt-[24px] text-[clamp(1.9rem,7vw,3.6rem)] font-bold text-paper leading-[1.1] tracking-[-0.01em]">
             Build the Future of
             <br />
             <span className="bg-[linear-gradient(100deg,var(--color-violet-2),var(--color-violet))] bg-clip-text text-transparent">Online Chess</span>
           </h1>
-          <p className="mt-[32px] font-display font-medium text-[1.15rem] text-paper">Making the Best Move on the Way to the Top</p>
-          <p className="mt-[20px] max-w-[46ch] max-[980px]:max-w-none text-mist text-[1rem] leading-[1.6]">
+          <p className="mt-[32px] font-display font-medium text-[0.95rem] sm:text-[1.15rem] text-paper">Making the Best Move on the Way to the Top</p>
+          <p className="mt-[20px] max-w-[46ch] max-[980px]:max-w-none text-mist text-[0.9rem] sm:text-[1rem] leading-[1.6]">
             A complete platform to play, learn, and compete. Challenge an adaptive Stockfish opponent or study legendary games that shaped chess history.
           </p>
           <div className="mt-[40px] flex gap-[14px] flex-wrap max-[520px]:flex-col max-[520px]:items-stretch">
@@ -86,7 +86,7 @@ export default function Hero() {
               Watch a legendary game
             </a>
           </div>
-          <p className="mt-[24px] font-mono py-[9px] text-[0.76rem] text-mist tracking-[0.01em]">
+          <p className="mt-[24px] font-mono py-[9px] text-[0.68rem] sm:text-[0.76rem] text-mist tracking-[0.01em]">
             3 legendary games to replay · Stockfish opponent, 5 difficulty levels · Free, no signup to play
           </p>
         </motion.div>
