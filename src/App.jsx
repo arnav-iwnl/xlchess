@@ -1,5 +1,4 @@
 import { useEffect, useState, lazy, Suspense, useRef } from "react";
-import LoadingScreen from "./components/LoadingScreen";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 
@@ -35,18 +34,9 @@ function LazySection({ children, minHeight = "50vh" }) {
 }
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Keep the loading screen extremely brief to protect Lighthouse scores
-    const t = setTimeout(() => setLoading(false), 200);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <>
       <a href="#main" className="skip-link">Skip to content</a>
-      <LoadingScreen visible={loading} />
       <Navbar />
       <main id="main">
         <Hero />
