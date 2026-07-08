@@ -35,12 +35,6 @@ function LazySection({ children, minHeight = "50vh" }) {
 }
 
 export default function App() {
-  useEffect(() => {
-    // Delay analytics to prevent Lighthouse penalty
-    const t = setTimeout(initAnalytics, 2500);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <>
       <a href="#main" className="skip-link">Skip to content</a>
