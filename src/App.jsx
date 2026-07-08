@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import LoadingScreen from "./components/LoadingScreen";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
-import FamousGames from "./components/FamousGames";
-import PlayStockfish from "./components/PlayStockfish";
-import Testimonials from "./components/Testimonials";
-import Contact from "./components/Contact";
-import Footer from "./components/Footer";
 import { initAnalytics } from "./lib/analytics";
+
+const FamousGames = lazy(() => import("./components/FamousGames"));
+const PlayStockfish = lazy(() => import("./components/PlayStockfish"));
+const Testimonials = lazy(() => import("./components/Testimonials"));
+const Contact = lazy(() => import("./components/Contact"));
+const Footer = lazy(() => import("./components/Footer"));
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -25,12 +26,16 @@ export default function App() {
       <Navbar />
       <main id="main">
         <Hero />
-        <FamousGames />
-        <PlayStockfish />
-        <Testimonials />
-        <Contact />
+        <Suspense fallback={<div className="h-[20vh]" />}>
+          <FamousGames />
+          <PlayStockfish />
+          <Testimonials />
+          <Contact />
+        </Suspense>
       </main>
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </>
   );
 }
