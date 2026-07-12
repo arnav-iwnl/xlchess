@@ -14,13 +14,28 @@
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
     </noscript>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4PL86Q2VHV"></script>
+    <!-- Google tag (gtag.js) - Deferred -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
       gtag('js', new Date());
       gtag('config', 'G-4PL86Q2VHV');
+      
+      const loadGTM = () => {
+        if (window.gtagLoaded) return;
+        window.gtagLoaded = true;
+        const script = document.createElement('script');
+        script.src = "https://www.googletagmanager.com/gtag/js?id=G-4PL86Q2VHV";
+        script.async = true;
+        document.head.appendChild(script);
+      };
+
+      // Load on interaction or fallback timeout
+      ['scroll', 'mousemove', 'touchstart', 'keydown', 'click'].forEach(event => {
+        window.addEventListener(event, loadGTM, { once: true, passive: true });
+      });
+      setTimeout(loadGTM, 3500);
     </script>
   </head>
   <body>
