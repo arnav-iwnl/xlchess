@@ -45,7 +45,9 @@ export default function Landing() {
 
         <LazySection minHeight="800px">
           <Suspense fallback={<div className="h-[800px]" />}>
-            <PlayStockfish enableCaching={false} />
+            <div className="container mx-auto px-[24px] max-w-[1050px]">
+              <PlayStockfish enableCaching={false} />
+            </div>
           </Suspense>
         </LazySection>
 

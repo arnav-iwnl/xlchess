@@ -252,18 +252,36 @@ export default function PlayStockfish({ enableCaching = false }) {
   const evalClamped = Math.max(-6, Math.min(6, evalPawns));
   const evalPct = 50 + (evalClamped / 6) * 50;
 
+  const displayEval = scoreMate !== null 
+    ? `M${Math.abs(scoreMate)}` 
+    : (evalPawns > 0 ? "+" : "") + evalPawns.toFixed(1);
+
   return (
     <div id="play" className="pt-[16px] pb-[32px] w-full">
       <div className="w-full">
         <p className="section-label">TEST YOURSELF</p>
         <h2 className="mt-[10px] text-[clamp(1.7rem,3.4vw,2.4rem)] font-semibold">Play against Stockfish</h2>
 
-        <div className="mt-[44px] grid grid-cols-[14px_minmax(0,560px)_320px] max-[980px]:grid-cols-[14px_1fr] max-[560px]:grid-cols-1 gap-[20px] items-start justify-center">
-          <div className="h-[min(560px,100%)] rounded-[7px] bg-[#1c2245] overflow-hidden flex items-end self-stretch border border-ink-3 max-[560px]:hidden" aria-hidden="true">
+        <div className="mt-[44px] grid grid-cols-[14px_minmax(0,560px)_320px] max-[980px]:grid-cols-[minmax(0,560px)] gap-[20px] items-start justify-center">
+          {/* Desktop Vertical Eval Bar */}
+          <div className="hidden min-[980px]:flex flex-col h-[min(560px,100%)] rounded-[7px] bg-[#1c2245] overflow-hidden items-end self-stretch border border-ink-3 relative" aria-hidden="true">
             <div className="w-full bg-[#eef1d8] transition-[height] duration-600 ease" style={{ height: `${evalPct}%` }} />
+            <div className="absolute inset-0 flex items-center justify-center z-10 mix-blend-difference pointer-events-none overflow-visible">
+              <span className="text-[0.65rem] font-mono text-white -rotate-90 whitespace-nowrap">
+                {displayEval}
+              </span>
+            </div>
           </div>
 
           <div className="min-w-0">
+            {/* Mobile Horizontal Eval Bar */}
+            <div className="min-[980px]:hidden w-full h-[18px] rounded-[7px] bg-[#1c2245] overflow-hidden flex items-stretch border border-ink-3 relative mb-[12px]" aria-hidden="true">
+              <div className="bg-[#eef1d8] transition-[width] duration-600 ease" style={{ width: `${evalPct}%` }} />
+              <span className="absolute inset-0 flex items-center justify-center text-[0.7rem] font-mono z-10 mix-blend-difference text-white pointer-events-none">
+                {displayEval}
+              </span>
+            </div>
+            
             <Chessboard
               board={board}
               interactive

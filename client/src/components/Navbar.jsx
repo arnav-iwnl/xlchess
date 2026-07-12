@@ -8,6 +8,7 @@ import {
   UserButton,
   useAuth,
   useUser,
+  useClerk,
 } from "@clerk/clerk-react";
 import { setTokenGetter, syncUser } from "../lib/api";
 
@@ -23,10 +24,28 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { getToken } = useAuth();
   const { user, isSignedIn } = useUser();
+  const clerk = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
 
   const isHome = location.pathname === "/home";
+
+  // Preload Clerk's authentication chunks to make the modal open instantly
+  useEffect(() => {
+    if (clerk && !isSignedIn) {
+      const dummyDiv = document.createElement("div");
+      dummyDiv.style.display = "none";
+      try {
+        clerk.mountSignIn(dummyDiv, { routing: "virtual" });
+        // The script fetch has started; unmount quickly to avoid duplicate mount errors later
+        setTimeout(() => {
+          clerk.unmountSignIn(dummyDiv);
+        }, 100);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+  }, [clerk, isSignedIn]);
 
   // Register the Clerk token getter for the API layer
   useEffect(() => {
@@ -43,14 +62,29 @@ export default function Navbar() {
   }, [isSignedIn, user?.username]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    const handleScroll = (e) => {
+      if (e.target.id === 'main-scroll') {
+        setScrolled(e.target.scrollTop > 12);
+      } else if (e.target === document || e.target === window) {
+        setScrolled(window.scrollY > 12);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, true);
+    
+    // Initial check
+    const mainScroll = document.getElementById('main-scroll');
+    if (mainScroll) {
+      setScrolled(mainScroll.scrollTop > 12);
+    } else {
+      setScrolled(window.scrollY > 12);
+    }
+
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [location.pathname]);
 
   return (
-    <header className={`sticky top-0 z-[100] transition-colors duration-250 border-b ${scrolled ? "bg-ink/86 backdrop-blur-[10px] border-line" : "bg-transparent border-transparent"}`}>
+    <header className={`fixed top-0 w-full z-[100] transition-colors duration-250 border-b ${scrolled ? "bg-ink/40 backdrop-blur-[16px] border-line/50" : "bg-transparent border-transparent"}`}>
       <div className="container flex items-center justify-between py-[15px]">
         {/* Logo — links to landing or home based on auth */}
         <Link to={isSignedIn ? "/home" : "/"} className="flex items-center gap-[10px] text-paper no-underline">
@@ -66,7 +100,12 @@ export default function Navbar() {
           {isHome ? (
             <>
               <Link to="/home" className="text-mist transition-colors duration-150 hover:text-paper">Play</Link>
-              <Link to="/home" className="text-mist transition-colors duration-150 hover:text-paper">History</Link>
+              <button 
+                onClick={() => window.dispatchEvent(new Event('toggleHistorySidebar'))}
+                className="bg-transparent border-none cursor-pointer p-0 font-body text-[0.92rem] text-mist transition-colors duration-150 hover:text-paper"
+              >
+                History
+              </button>
               <Link to="/" className="text-mist transition-colors duration-150 hover:text-paper">Landing</Link>
             </>
           ) : (
@@ -93,11 +132,6 @@ export default function Navbar() {
             </SignUpButton>
           </SignedOut>
           <SignedIn>
-            {!isHome && (
-              <Link to="/home" className="btn btn-primary max-[860px]:hidden !h-[36px] !py-0 !px-[18px] !text-[0.85rem] !inline-flex !items-center !justify-center no-underline">
-                Dashboard
-              </Link>
-            )}
             <UserButton
               afterSignOutUrl="/"
               appearance={{
@@ -127,7 +161,15 @@ export default function Navbar() {
           {isHome ? (
             <>
               <Link to="/home" className="py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline" onClick={() => setOpen(false)}>Play</Link>
-              <Link to="/home" className="py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline" onClick={() => setOpen(false)}>History</Link>
+              <button 
+                onClick={() => {
+                  setOpen(false);
+                  window.dispatchEvent(new Event('toggleHistorySidebar'));
+                }}
+                className="w-full text-left bg-transparent cursor-pointer font-body py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline"
+              >
+                History
+              </button>
               <Link to="/" className="py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline" onClick={() => setOpen(false)}>Landing</Link>
             </>
           ) : (

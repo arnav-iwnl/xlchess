@@ -17,11 +17,29 @@ export default function Home() {
   const [selectedGame, setSelectedGame] = useState(null);
   const playRef = useRef(null);
 
+  useEffect(() => {
+    const handleToggle = () => setSidebarOpen((prev) => !prev);
+    window.addEventListener("toggleHistorySidebar", handleToggle);
+    return () => window.removeEventListener("toggleHistorySidebar", handleToggle);
+  }, []);
+
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-[28px] h-[28px] border-[3px] border-line border-t-violet rounded-full animate-spin" />
-      </div>
+      <main className="flex flex-col h-screen overflow-hidden min-[980px]:flex-row relative pointer-events-none">
+        <section className="flex-1 flex flex-col overflow-y-auto relative h-full bg-[radial-gradient(ellipse_900px_500px_at_15%_-10%,rgba(139,123,240,0.18),transparent_60%)]">
+          <div className="pt-[89px] pb-[16px] flex-none">
+            <div className="container max-w-[900px] mx-auto px-[24px]">
+              <div className="h-[44px] w-[300px] bg-ink-2 rounded-[8px] animate-pulse mb-[16px]" />
+              <div className="h-[18px] w-full max-w-[450px] bg-ink-2 rounded-[6px] animate-pulse" />
+            </div>
+          </div>
+          <div className="flex-1 flex m-1 flex-col items-center">
+            <div className="w-full max-w-[900px] px-[24px]">
+              <div className="mt-[44px] h-[560px] w-full bg-ink-2 rounded-[14px] animate-pulse border border-line" />
+            </div>
+          </div>
+        </section>
+      </main>
     );
   }
 
@@ -34,20 +52,7 @@ export default function Home() {
   }
 
   return (
-    <main id="main" className="flex flex-col h-[calc(100vh-64px)] overflow-hidden min-[980px]:flex-row relative">
-      {/* Mobile Sidebar Toggle Button */}
-      <div className="min-[980px]:hidden bg-ink border-b border-line p-[16px] flex items-center justify-between z-40 relative flex-none">
-        <div className="flex items-center gap-[10px]">
-          <button 
-            className="btn btn-ghost !p-[8px]" 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle History Sidebar"
-          >
-            {sidebarOpen ? <FiX className="text-[1.2rem]" /> : <FiMenu className="text-[1.2rem]" />}
-          </button>
-          <span className="font-display font-semibold">Dashboard</span>
-        </div>
-      </div>
+    <main id="main" className="flex flex-col h-screen overflow-hidden min-[980px]:flex-row relative">
 
       {/* Sidebar (History) */}
       <aside 
@@ -58,7 +63,7 @@ export default function Home() {
             : 'max-[979px]:-translate-x-full min-[980px]:w-0 min-[980px]:min-w-0 border-r-0'
           }`}
       >
-        <div className="w-[320px] max-[979px]:w-full h-full flex flex-col flex-none">
+        <div className="w-[320px] max-[979px]:w-full h-full flex flex-col flex-none min-[980px]:pt-[65px]">
           <div className="p-[16px] border-b border-line flex items-center justify-between sticky top-0 bg-ink-2 z-10 flex-none">
             <div className="flex items-center gap-[8px]">
               <FiClock className="text-violet-2" />
@@ -85,26 +90,12 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* Toggle Sidebar Button for Desktop (Fixed relative to main area) */}
-      <div className="absolute top-[16px] left-[16px] z-20 hidden min-[980px]:block">
-        {!sidebarOpen && (
-          <button 
-            className="btn btn-ghost !p-[8px] bg-ink-2 border border-line shadow-md hover:bg-ink-3"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open History Sidebar"
-          >
-            <FiMenu className="text-[1.2rem]" />
-          </button>
-        )}
-      </div>
-
       {/* Main Content Area */}
-      <section className="flex-1 flex flex-col overflow-y-auto relative h-full">
+      <section id="main-scroll" className="flex-1 flex flex-col overflow-y-auto relative h-full bg-[radial-gradient(ellipse_900px_500px_at_15%_-10%,rgba(139,123,240,0.18),transparent_60%)]">
         {/* Welcome Header */}
-        <div className="pt-[24px] pb-[16px] bg-[radial-gradient(ellipse_900px_500px_at_15%_-10%,rgba(139,123,240,0.18),transparent_60%)] flex-none">
+        <div className="pt-[89px] pb-[16px] flex-none">
           <div className="container max-w-[900px] mx-auto px-[24px]">
-            <p className="eyebrow">Dashboard</p>
-            <h1 className="mt-[16px] text-[clamp(1.6rem,4vw,2.6rem)] font-bold text-paper leading-[1.1]">
+            <h1 className="text-[clamp(1.6rem,4vw,2.6rem)] font-bold text-paper leading-[1.1]">
               Welcome back,{" "}
               <span className="bg-[linear-gradient(100deg,var(--color-violet-2),var(--color-violet))] bg-clip-text text-transparent">
                 {user.username || user.firstName || "Player"}
@@ -118,7 +109,7 @@ export default function Home() {
         </div>
 
         {/* Play / Replay Section */}
-        <div ref={playRef} className="flex-1 flex flex-col items-center">
+        <div ref={playRef} className="flex-1 flex m-1 flex-col items-center">
           <div className="w-full max-w-[900px] px-[24px]">
             <Suspense fallback={<div className="h-[800px]" />}>
               {selectedGame ? (
