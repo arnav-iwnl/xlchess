@@ -1,0 +1,25 @@
+{
+  "name": "xlchess-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "prisma:generate": "npx prisma generate",
+    "prisma:push": "npx prisma db push",
+    "prisma:studio": "npx prisma studio"
+  },
+  "dependencies": {
+    "@clerk/express": "^2.0.0",
+    "@prisma/client": "^6.9.0",
+    "@upstash/redis": "^1.38.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^6.9.0"
+  }
+}

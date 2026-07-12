@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { motion } from "framer-motion";
 import { FiPlay, FiPause, FiRotateCcw } from "react-icons/fi";
+import { Link } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import Chessboard from "./Chessboard";
 import { famousGames } from "../data/famousGames";
 import { trackEvent } from "../lib/analytics";
@@ -10,6 +12,7 @@ const FEATURED = famousGames[0]; // The Evergreen Game
 const STEP_MS = 1100;
 
 export default function Hero() {
+  const { isSignedIn } = useUser();
   const [moveIndex, setMoveIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const chessRef = useRef(new Chess());
@@ -74,9 +77,15 @@ export default function Hero() {
           Challenge an adaptive Stockfish opponent or study legendary games that shaped chess history.
           </p>
           <div className="mt-[40px] flex gap-[14px] flex-wrap max-[520px]:flex-col max-[520px]:items-stretch">
-            <a href="#play" className="btn btn-primary max-[520px]:justify-center" onClick={() => trackEvent("cta_play_click", { location: "hero" })}>
-              <span aria-hidden="true">♟</span> Play
-            </a>
+            {isSignedIn ? (
+              <Link to="/home" className="btn btn-primary max-[520px]:justify-center" onClick={() => trackEvent("cta_play_click", { location: "hero" })}>
+                <span aria-hidden="true">♟</span> Dashboard
+              </Link>
+            ) : (
+              <a href="#play" className="btn btn-primary max-[520px]:justify-center" onClick={() => trackEvent("cta_play_click", { location: "hero" })}>
+                <span aria-hidden="true">♟</span> Play
+              </a>
+            )}
             <a href="#games" className="btn btn-ghost max-[520px]:justify-center">
               Watch a legendary game
             </a>

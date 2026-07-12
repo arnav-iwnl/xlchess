@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
-import { FiRotateCcw, FiRepeat, FiZap } from "react-icons/fi";
+import { useUser } from "@clerk/clerk-react";
+import { FiRotateCcw, FiRepeat, FiZap, FiSave } from "react-icons/fi";
 import Chessboard from "./Chessboard";
 import { useStockfish, DIFFICULTIES } from "../hooks/useStockfish";
 import { trackEvent } from "../lib/analytics";
+import { startGameSession, cacheMove, flushGame } from "../lib/api";
 
-export default function PlayStockfish() {
+export default function PlayStockfish({ enableCaching = false }) {
   const { ready, error, requestBestMove, scoreCp, scoreMate } = useStockfish();
+  const { isSignedIn } = useUser();
   const gameRef = useRef(new Chess());
   const [fen, setFen] = useState(gameRef.current.fen());
   const [selected, setSelected] = useState(null);
@@ -14,6 +17,9 @@ export default function PlayStockfish() {
   const [orientation, setOrientation] = useState("white");
   const [hint, setHint] = useState(null);
   const [engineTurn, setEngineTurn] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
+  const lastSavedMoveCount = useRef(0); // track moves saved so we know if there are unsaved moves
+  const sessionIdRef = useRef(null); // Redis game session ID
   const evalSideRef = useRef("b"); // side to move when the last eval was captured
 
   const difficulty = DIFFICULTIES[difficultyIdx];
@@ -24,6 +30,8 @@ export default function PlayStockfish() {
 
   const gameOver = chess.isGameOver();
   const status = describeStatus(chess, gameOver);
+
+  const useCaching = enableCaching && isSignedIn;
 
   const legalTargets = useMemo(() => {
     if (!selected) return [];
@@ -47,6 +55,30 @@ export default function PlayStockfish() {
     return null;
   }, [fen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Start a Redis game session when caching is enabled and first move is made
+  async function ensureSession() {
+    if (!useCaching || sessionIdRef.current) return;
+    try {
+      const sid = await startGameSession({
+        difficulty: difficulty.label,
+        playerColor: orientation,
+      });
+      sessionIdRef.current = sid;
+    } catch (err) {
+      console.warn("Failed to start game session:", err.message);
+    }
+  }
+
+  // Cache a move to Redis
+  async function cacheMoveToRedis(san) {
+    if (!useCaching || !sessionIdRef.current) return;
+    try {
+      await cacheMove(sessionIdRef.current, san);
+    } catch (err) {
+      console.warn("Failed to cache move:", err.message);
+    }
+  }
+
   const requestEngineMove = useCallback(async () => {
     if (chess.isGameOver()) return;
     setEngineTurn(true);
@@ -57,14 +89,16 @@ export default function PlayStockfish() {
       const to = uci.slice(2, 4);
       const promotion = uci.length > 4 ? uci.slice(4) : undefined;
       try {
-        chess.move({ from, to, promotion });
+        const move = chess.move({ from, to, promotion });
         setFen(chess.fen());
+        // Cache the engine's move to Redis
+        if (move) cacheMoveToRedis(move.san);
       } catch {
         // Defensive: ignore an illegal engine move rather than crash the UI.
       }
     }
     setEngineTurn(false);
-  }, [chess, difficulty, requestBestMove]);
+  }, [chess, difficulty, requestBestMove, useCaching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyPlayerMove(from, to) {
     let move;
@@ -78,6 +112,10 @@ export default function PlayStockfish() {
     setSelected(null);
     setHint(null);
     trackEvent("play_move", { san: move.san });
+
+    // Start session on first move, then cache the move
+    ensureSession().then(() => cacheMoveToRedis(move.san));
+
     return true;
   }
 
@@ -126,13 +164,74 @@ export default function PlayStockfish() {
     trackEvent("play_undo");
   }
 
-  function handleReset() {
+  async function handleSave() {
+    if (!useCaching || !sessionIdRef.current || history.length === 0 || lastSavedMoveCount.current === history.length) return;
+    
+    setSaveStatus("saving");
+    try {
+      const result = chess.isGameOver()
+        ? chess.isCheckmate()
+          ? (chess.turn() === "w" ? "black_win" : "white_win")
+          : "draw"
+        : "abandoned";
+      // Pass endSession = false because the user is just manually saving and can keep playing
+      await flushGame(sessionIdRef.current, result, false);
+      setSaveStatus("saved");
+      lastSavedMoveCount.current = history.length;
+    } catch {
+      setSaveStatus("error");
+    }
+  }
+
+  async function handleReset() {
+    // If caching is active and there are unsaved moves, flush to NeonDB first
+    if (useCaching && sessionIdRef.current && history.length > 0 && lastSavedMoveCount.current < history.length) {
+      setSaveStatus("saving");
+      try {
+        const result = chess.isGameOver()
+          ? chess.isCheckmate()
+            ? (chess.turn() === "w" ? "black_win" : "white_win")
+            : "draw"
+          : "abandoned";
+        // Reset ends the session completely
+        await flushGame(sessionIdRef.current, result, true);
+        setSaveStatus("saved");
+      } catch {
+        setSaveStatus("error");
+      }
+    }
+
+    sessionIdRef.current = null;
+    lastSavedMoveCount.current = 0;
     gameRef.current = new Chess();
     setFen(gameRef.current.fen());
     setSelected(null);
     setHint(null);
+    // Clear save status after a short delay for visual feedback
+    setTimeout(() => setSaveStatus(null), 2000);
     trackEvent("play_reset");
   }
+
+  // Auto-flush game from Redis → NeonDB when it ends (only when caching is active)
+  useEffect(() => {
+    if (!gameOver || !useCaching || lastSavedMoveCount.current === history.length) return;
+    if (history.length === 0 || !sessionIdRef.current) return;
+
+    lastSavedMoveCount.current = history.length;
+
+    const result = chess.isCheckmate()
+      ? (chess.turn() === "w" ? "black_win" : "white_win")
+      : "draw";
+
+    setSaveStatus("saving");
+    // End of game means end of session
+    flushGame(sessionIdRef.current, result, true)
+      .then(() => {
+        setSaveStatus("saved");
+        sessionIdRef.current = null;
+      })
+      .catch(() => setSaveStatus("error"));
+  }, [gameOver, useCaching, history, chess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleHint() {
     if (engineTurn || gameOver || chess.turn() !== "w") return;
@@ -154,8 +253,8 @@ export default function PlayStockfish() {
   const evalPct = 50 + (evalClamped / 6) * 50;
 
   return (
-    <section id="play" className="py-[96px] border-t border-line bg-[linear-gradient(180deg,transparent,rgba(139,123,240,0.05))]">
-      <div className="container">
+    <div id="play" className="pt-[16px] pb-[32px] w-full">
+      <div className="w-full">
         <p className="section-label">TEST YOURSELF</p>
         <h2 className="mt-[10px] text-[clamp(1.7rem,3.4vw,2.4rem)] font-semibold">Play against Stockfish</h2>
 
@@ -181,6 +280,16 @@ export default function PlayStockfish() {
               {Boolean(error) && error}
               {ready && (engineTurn ? "Stockfish is thinking…" : status)}
             </p>
+            {saveStatus && (
+              <p className={`mt-[6px] font-mono text-[0.75rem] text-center flex items-center justify-center gap-[6px] ${
+                saveStatus === "saved" ? "text-green-400" : saveStatus === "error" ? "text-red-400" : "text-mist"
+              }`}>
+                <FiSave className="text-[0.7rem]" />
+                {saveStatus === "saving" && "Saving game…"}
+                {saveStatus === "saved" && "Game saved to your history!"}
+                {saveStatus === "error" && "Failed to save game"}
+              </p>
+            )}
           </div>
 
           <aside className="flex flex-col gap-[20px] max-[980px]:col-span-full">
@@ -220,6 +329,15 @@ export default function PlayStockfish() {
               >
                 <FiRepeat /> Flip
               </button>
+              {useCaching && (
+                <button 
+                  className="btn btn-primary col-span-2 justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" 
+                  onClick={handleSave} 
+                  disabled={history.length === 0 || lastSavedMoveCount.current === history.length || engineTurn}
+                >
+                  <FiSave /> {lastSavedMoveCount.current === history.length && history.length > 0 ? "Saved" : "Save Game"}
+                </button>
+              )}
             </div>
 
             <div className="bg-ink-2 border border-ink-3 rounded-[14px] p-[16px] flex-1 min-h-[160px] max-h-[320px] overflow-y-auto">
@@ -241,7 +359,7 @@ export default function PlayStockfish() {
           </aside>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 

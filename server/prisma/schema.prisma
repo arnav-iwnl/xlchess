@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  username  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  games     Game[]
+}
+
+model Game {
+  id          String   @id @default(cuid())
+  sessionId   String?  @unique
+  username    String
+  moves       String[] // Array of SAN move strings for replay
+  result      String   // "white_win", "black_win", "draw"
+  difficulty  String   // "Beginner", "Easy", "Intermediate", "Advanced", "Expert"
+  playerColor String   // "white" or "black"
+  totalMoves  Int
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [username], references: [username])
+
+  @@index([username])
+}
