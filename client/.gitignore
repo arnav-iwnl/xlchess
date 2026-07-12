@@ -7,14 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Node
-node_modules/
-client/node_modules/
-server/node_modules/
-
-# Build outputs
-client/dist/
-client/dist-ssr/
+node_modules
+dist
+dist-ssr
+*.local
 
 # Editor directories and files
 .vscode/*
@@ -27,13 +23,10 @@ client/dist-ssr/
 *.sln
 *.sw?
 
-# Environment variables
 .env
 .env.*
-client/.env
-client/.env.*
-server/.env
-server/.env.*
 
-# Server specifics
+# Server
+server/.env
+server/node_modules
 server/prisma/*.db
