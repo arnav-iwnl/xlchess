@@ -71,7 +71,7 @@ export default function Hero() {
           </h1>
           <p className="mt-[32px] font-display font-medium text-[0.95rem] sm:text-[1.15rem] text-paper">Making the Best Move on the Way to the Top</p>
           <p className="mt-[20px] max-w-[46ch] max-[980px]:max-w-none text-mist text-[0.9rem] sm:text-[1rem] leading-[1.6]">
-            A complete platform to play, learn, and compete. Challenge an adaptive Stockfish opponent or study legendary games that shaped chess history.
+          Challenge an adaptive Stockfish opponent or study legendary games that shaped chess history.
           </p>
           <div className="mt-[40px] flex gap-[14px] flex-wrap max-[520px]:flex-col max-[520px]:items-stretch">
             <a href="#play" className="btn btn-primary max-[520px]:justify-center" onClick={() => trackEvent("cta_play_click", { location: "hero" })}>

@@ -40,7 +40,7 @@ function ChessboardBase({
   const legalSet = useMemo(() => new Set(legalTargets), [legalTargets]);
 
   return (
-    <div className="w-full aspect-square rounded-[14px] overflow-hidden border border-ink-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_50px_rgba(0,0,0,0.45)]">
+    <div className="w-full aspect-square overflow-hidden border border-ink-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_50px_rgba(0,0,0,0.45)]">
       <div
         className="grid grid-rows-8 w-full h-full"
         role={interactive ? "grid" : "img"}

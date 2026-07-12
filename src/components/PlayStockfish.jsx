@@ -176,7 +176,7 @@ export default function PlayStockfish() {
               orientation={orientation}
               ariaLabel="Interactive game against Stockfish"
             />
-            <p className="mt-[12px] font-mono text-[0.82rem] text-mist text-center min-h-[1.2em]" aria-live="polite">
+            <p className="mt-[18px] font-mono text-[0.82rem] text-mist text-center min-h-[1.2em]" aria-live="polite">
               {!ready && !error && "Loading engine…"}
               {Boolean(error) && error}
               {ready && (engineTurn ? "Stockfish is thinking…" : status)}
@@ -225,9 +225,9 @@ export default function PlayStockfish() {
             <div className="bg-ink-2 border border-ink-3 rounded-[14px] p-[16px] flex-1 min-h-[160px] max-h-[320px] overflow-y-auto">
               <p className="section-label">Moves</p>
               {history.length === 0 ? (
-                <p className="mt-[10px] text-[0.85rem] text-mist leading-[1.5]">No moves yet. You're playing White — make a move on the board.</p>
+                <p className="mt-[15px] text-[0.85rem] text-mist leading-[1.5]">No moves yet. You're playing White — make a move on the board.</p>
               ) : (
-                <ol className="mt-[10px] mb-0 mx-0 p-0 list-none font-mono text-[0.85rem]">
+                <ol className="mt-[15px] mb-0 mx-0 p-0 list-none font-mono text-[0.85rem]">
                   {chunk(history).map(([n, w, b]) => (
                     <li key={n} className="grid grid-cols-[26px_1fr_1fr] gap-[6px] py-[3px] px-0">
                       <span className="text-mist">{n}.</span>

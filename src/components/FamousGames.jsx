@@ -65,11 +65,11 @@ export default function FamousGames() {
         <h2 className="mt-[10px] text-[clamp(1.7rem,3.4vw,2.4rem)] font-semibold max-w-[20ch]">Games that taught chess how to attack</h2>
 
         <div className="mt-[44px] grid grid-cols-[0.85fr_1fr_0.75fr] max-[1080px]:grid-cols-2 max-[700px]:grid-cols-1 gap-[28px] items-start">
-          <ul className="list-none m-0 p-0 flex flex-col gap-[12px] max-[1080px]:col-span-full max-[1080px]:flex-row max-[1080px]:flex-wrap" role="list">
+          <ul className="list-none m-0 p-0 flex flex-col gap-[12px] max-[1080px]:col-span-full max-[1080px]:flex-row max-[1080px]:flex-wrap max-[1080px]:items-stretch" role="list">
             {famousGames.map((g) => (
-              <li key={g.id} className="max-[1080px]:flex-[1_1_260px]">
+              <li key={g.id} className="flex max-[1080px]:flex-[1_1_260px] max-[1080px]:self-stretch">
                 <button
-                  className={`w-full text-left bg-ink-2 border rounded-[14px] p-[18px] cursor-pointer text-paper transition-all duration-150 ease hover:border-violet-2 hover:-translate-y-[2px] ${g.id === activeId ? "border-violet-2 bg-[linear-gradient(160deg,rgba(139,123,240,0.14),var(--color-ink-2))]" : "border-ink-3"}`}
+                  className={`h-full w-full text-left bg-ink-2 border rounded-[14px] p-[18px] cursor-pointer text-paper transition-all duration-150 ease hover:border-violet-2 hover:-translate-y-[2px] ${g.id === activeId ? "border-violet-2 bg-[linear-gradient(160deg,rgba(139,123,240,0.14),var(--color-ink-2))]" : "border-ink-3"}`}
                   onClick={() => selectGame(g.id)}
                   aria-pressed={g.id === activeId}
                 >
