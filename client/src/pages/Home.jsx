@@ -80,10 +80,15 @@ export default function Home() {
           
           <div className="flex-1 overflow-y-auto w-full">
             <Suspense fallback={<div className="h-[400px]" />}>
-              <GameHistory compact={true} onGameSelect={(game) => {
-                setSelectedGame(game);
-                if (window.innerWidth < 980) setSidebarOpen(false);
-                scrollTo(playRef);
+              <GameHistory compact={true} onGameSelect={async (game) => {
+                try {
+                  const fullGame = await import("../lib/api").then(m => m.getGameById(game.id));
+                  setSelectedGame(fullGame);
+                  if (window.innerWidth < 980) setSidebarOpen(false);
+                  scrollTo(playRef);
+                } catch (e) {
+                  console.error("Failed to load game details", e);
+                }
               }} />
             </Suspense>
           </div>

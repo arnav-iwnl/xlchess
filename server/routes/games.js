@@ -189,6 +189,16 @@ router.get("/", async (req, res) => {
     const games = await prisma.game.findMany({
       where: { username: user.username },
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        sessionId: true,
+        username: true,
+        result: true,
+        difficulty: true,
+        playerColor: true,
+        totalMoves: true,
+        createdAt: true,
+      }
     });
 
     res.json({ games });
