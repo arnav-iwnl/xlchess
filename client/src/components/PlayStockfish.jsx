@@ -7,20 +7,43 @@ import { useStockfish, DIFFICULTIES } from "../hooks/useStockfish";
 import { trackEvent } from "../lib/analytics";
 import { startGameSession, cacheMove, flushGame } from "../lib/api";
 
-export default function PlayStockfish({ enableCaching = false }) {
+export default function PlayStockfish({ 
+  enableCaching = false, 
+  initialMoves = [], 
+  initialDifficulty = "Intermediate", 
+  initialOrientation = "white",
+  resumeGameId = null
+}) {
   const { ready, error, requestBestMove, scoreCp, scoreMate } = useStockfish();
   const { isSignedIn } = useUser();
-  const gameRef = useRef(new Chess());
-  const [fen, setFen] = useState(gameRef.current.fen());
+  
+  const gameRef = useRef(null);
+  if (!gameRef.current) {
+    const chess = new Chess();
+    for (const move of initialMoves) {
+      try { chess.move(move); } catch (e) { console.warn("Invalid initial move", move); }
+    }
+    gameRef.current = chess;
+  }
+  
+  const [fen, setFen] = useState(() => gameRef.current.fen());
   const [selected, setSelected] = useState(null);
-  const [difficultyIdx, setDifficultyIdx] = useState(2);
-  const [orientation, setOrientation] = useState("white");
+  const [difficultyIdx, setDifficultyIdx] = useState(() => {
+    const idx = DIFFICULTIES.findIndex(d => d.label === initialDifficulty);
+    return idx !== -1 ? idx : 2;
+  });
+  const [orientation, setOrientation] = useState(initialOrientation);
   const [hint, setHint] = useState(null);
   const [engineTurn, setEngineTurn] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
-  const lastSavedMoveCount = useRef(0); // track moves saved so we know if there are unsaved moves
+  
+  // Track the initial state locally so we can clear it if the user hits "Reset"
+  const activeInitialMovesRef = useRef(initialMoves);
+  const activeResumeGameIdRef = useRef(resumeGameId);
+
+  const lastSavedMoveCount = useRef(initialMoves.length); // start tracking from initial state
   const sessionIdRef = useRef(null); // Redis game session ID
-  const evalSideRef = useRef("b"); // side to move when the last eval was captured
+  const evalSideRef = useRef(initialMoves.length % 2 === 0 ? "w" : "b"); // side to move
 
   const difficulty = DIFFICULTIES[difficultyIdx];
 
@@ -62,6 +85,8 @@ export default function PlayStockfish({ enableCaching = false }) {
       const sid = await startGameSession({
         difficulty: difficulty.label,
         playerColor: orientation,
+        initialMoves: activeInitialMovesRef.current,
+        resumeGameId: activeResumeGameIdRef.current,
       });
       sessionIdRef.current = sid;
     } catch (err) {
@@ -202,6 +227,10 @@ export default function PlayStockfish({ enableCaching = false }) {
         setSaveStatus("error");
       }
     }
+
+    // Clear active resume states so the new game is fully independent
+    activeInitialMovesRef.current = [];
+    activeResumeGameIdRef.current = null;
 
     sessionIdRef.current = null;
     lastSavedMoveCount.current = 0;

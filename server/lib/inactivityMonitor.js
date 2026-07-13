@@ -35,7 +35,7 @@ export async function flushSessionToDb(sessionKey, endSession = true) {
 
       await prisma.game.upsert({
         where: { sessionId },
-        update: data,
+        update: { ...data, createdAt: new Date() },
         create: data,
       });
       console.log(`[InactivityMonitor] Saved session ${sessionId} (${moves.length} moves)`);

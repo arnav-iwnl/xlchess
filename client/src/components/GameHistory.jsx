@@ -141,7 +141,7 @@ function GameCard({ game, onClick, compact }) {
   );
 }
 
-export function GameReplay({ game, onBack }) {
+export function GameReplay({ game, onBack, onResume }) {
   const [moveIndex, setMoveIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const totalMoves = game.moves.length;
@@ -274,9 +274,19 @@ export function GameReplay({ game, onBack }) {
                 End ⏭
               </button>
             </div>
+            {onResume && (
+              <div className="mt-[16px] flex justify-center">
+                <button
+                  className="btn btn-primary !py-[10px] !px-[20px] !text-[0.85rem] !bg-violet/90 hover:!bg-violet"
+                  onClick={() => onResume(game.moves.slice(0, moveIndex), game.difficulty, game.playerColor, game.id)}
+                >
+                  <FiPlay className="mr-[6px]"/> Resume from here
+                </button>
+              </div>
+            )}
           </div>
 
-          <aside className="bg-ink-2 border border-ink-3 rounded-[14px] p-[16px] max-h-[520px] overflow-y-auto">
+          <aside className="w-full mt-[24px] bg-ink-2 border border-ink-3 rounded-[14px] p-[16px] max-h-[520px] overflow-y-auto">
             <p className="section-label">MOVES</p>
             {game.moves.length === 0 ? (
               <p className="mt-[15px] text-[0.85rem] text-mist">No moves recorded.</p>

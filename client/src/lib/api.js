@@ -61,10 +61,12 @@ export async function getGameById(id) {
 
 // ---------- Redis-cached Game Session API ----------
 
-export async function startGameSession({ difficulty, playerColor }) {
+export async function startGameSession({ difficulty, playerColor, initialMoves, resumeGameId }) {
   const { data } = await api.post("/api/games/session", {
     difficulty,
     playerColor,
+    initialMoves,
+    resumeGameId,
   });
   return data.sessionId;
 }

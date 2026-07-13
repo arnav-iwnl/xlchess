@@ -15,6 +15,7 @@ export default function Home() {
     typeof window !== "undefined" && window.innerWidth >= 980
   );
   const [selectedGame, setSelectedGame] = useState(null);
+  const [resumeState, setResumeState] = useState(null); // { initialMoves, initialDifficulty, initialOrientation }
   const playRef = useRef(null);
 
   useEffect(() => {
@@ -118,9 +119,20 @@ export default function Home() {
           <div className="w-full max-w-[900px] px-[24px]">
             <Suspense fallback={<div className="h-[800px]" />}>
               {selectedGame ? (
-                <GameReplay game={selectedGame} onBack={() => setSelectedGame(null)} />
+                <GameReplay 
+                  game={selectedGame} 
+                  onBack={() => setSelectedGame(null)} 
+                  onResume={(initialMoves, initialDifficulty, initialOrientation, resumeGameId) => {
+                    setResumeState({ initialMoves, initialDifficulty, initialOrientation, resumeGameId });
+                    setSelectedGame(null); // close replay view
+                  }}
+                />
               ) : (
-                <PlayStockfish enableCaching={true} />
+                <PlayStockfish 
+                  key={resumeState ? resumeState.initialMoves.length : 'default'}
+                  enableCaching={true} 
+                  {...(resumeState || {})}
+                />
               )}
             </Suspense>
           </div>

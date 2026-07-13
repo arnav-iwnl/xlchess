@@ -42,13 +42,32 @@ router.post("/session", async (req, res) => {
     const username = await resolveUsername(req);
     if (!username) return res.status(401).json({ error: "Unauthorized" });
 
-    const { difficulty, playerColor } = req.body;
+    const { difficulty, playerColor, initialMoves, resumeGameId } = req.body;
     if (!difficulty || !playerColor) {
       return res.status(400).json({ error: "Missing difficulty or playerColor" });
     }
 
-    const sessionId = randomUUID();
+    let sessionId;
+    if (resumeGameId) {
+      const existingGame = await prisma.game.findUnique({ where: { id: resumeGameId } });
+      if (existingGame) {
+        sessionId = existingGame.sessionId;
+        if (!sessionId) {
+          sessionId = randomUUID();
+          await prisma.game.update({ where: { id: resumeGameId }, data: { sessionId } });
+        }
+      } else {
+        sessionId = randomUUID();
+      }
+    } else {
+      sessionId = randomUUID();
+    }
+
     const sessionKey = `game:${username}:session:${sessionId}`;
+
+    // Clear any lingering data for this session to ensure a clean slate
+    await redis.del(sessionKey);
+    await redis.del(`${sessionKey}:moves`);
 
     // Store session metadata as a hash
     await redis.hset(sessionKey, {
@@ -59,6 +78,10 @@ router.post("/session", async (req, res) => {
       lastActivity: Date.now().toString(),
       result: "in_progress",
     });
+
+    if (initialMoves && Array.isArray(initialMoves) && initialMoves.length > 0) {
+      await redis.rpush(`${sessionKey}:moves`, ...initialMoves);
+    }
 
     res.status(201).json({ sessionId });
   } catch (error) {
