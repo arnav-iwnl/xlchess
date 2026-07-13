@@ -31,7 +31,13 @@ export default function GameHistory({ compact = false, onGameSelect }) {
     }
 
     fetchGames();
-    return () => { cancelled = true; };
+
+    // Listen for manual game saves from PlayStockfish to refresh the list instantly
+    window.addEventListener("gameSaved", fetchGames);
+    return () => { 
+      cancelled = true; 
+      window.removeEventListener("gameSaved", fetchGames);
+    };
   }, []);
 
   return (

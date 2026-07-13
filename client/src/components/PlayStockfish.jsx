@@ -178,6 +178,7 @@ export default function PlayStockfish({ enableCaching = false }) {
       await flushGame(sessionIdRef.current, result, false);
       setSaveStatus("saved");
       lastSavedMoveCount.current = history.length;
+      window.dispatchEvent(new Event("gameSaved"));
     } catch {
       setSaveStatus("error");
     }
@@ -196,6 +197,7 @@ export default function PlayStockfish({ enableCaching = false }) {
         // Reset ends the session completely
         await flushGame(sessionIdRef.current, result, true);
         setSaveStatus("saved");
+        window.dispatchEvent(new Event("gameSaved"));
       } catch {
         setSaveStatus("error");
       }
@@ -229,6 +231,7 @@ export default function PlayStockfish({ enableCaching = false }) {
       .then(() => {
         setSaveStatus("saved");
         sessionIdRef.current = null;
+        window.dispatchEvent(new Event("gameSaved"));
       })
       .catch(() => setSaveStatus("error"));
   }, [gameOver, useCaching, history, chess]); // eslint-disable-line react-hooks/exhaustive-deps
