@@ -96,7 +96,11 @@ export default function PlayStockfish({
 
   // Cache a move to Redis
   async function cacheMoveToRedis(san) {
-    if (!useCaching || !sessionIdRef.current) return;
+    if (!useCaching) return;
+    if (!sessionIdRef.current) {
+      await ensureSession();
+    }
+    if (!sessionIdRef.current) return;
     try {
       await cacheMove(sessionIdRef.current, san);
     } catch (err) {
@@ -139,7 +143,7 @@ export default function PlayStockfish({
     trackEvent("play_move", { san: move.san });
 
     // Start session on first move, then cache the move
-    ensureSession().then(() => cacheMoveToRedis(move.san));
+    cacheMoveToRedis(move.san);
 
     return true;
   }
