@@ -38,6 +38,10 @@ export async function flushSessionToDb(sessionKey, endSession = true) {
         update: { ...data, createdAt: new Date() },
         create: data,
       });
+
+      // Invalidate game history cache
+      await redis.del(`user_games:${meta.username}`);
+
       console.log(`[InactivityMonitor] Saved session ${sessionId} (${moves.length} moves)`);
     }
 

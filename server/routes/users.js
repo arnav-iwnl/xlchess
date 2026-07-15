@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import prisma from "../lib/prisma.js";
+import redis from "../lib/redis.js";
 
 const router = Router();
 
@@ -36,6 +37,9 @@ router.post("/sync", async (req, res) => {
         username,
       },
     });
+
+    // Pre-warm the Redis cache for this user
+    await redis.set(`clerk_username:${userId}`, user.username);
 
     res.json({ user });
   } catch (error) {

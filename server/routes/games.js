@@ -13,13 +13,20 @@ async function resolveUsername(req) {
   const { userId } = getAuth(req);
   if (!userId) return null;
 
-  // Check our DB first
-  let user = await prisma.user.findUnique({ where: { clerkId: userId } });
-  if (user) return user.username;
+  // 1. Check Redis cache first (instant)
+  let username = await redis.get(`clerk_username:${userId}`);
+  if (username) return username;
 
-  // Auto-sync from Clerk
+  // 2. Check our DB (might incur cold start)
+  let user = await prisma.user.findUnique({ where: { clerkId: userId } });
+  if (user) {
+    await redis.set(`clerk_username:${userId}`, user.username);
+    return user.username;
+  }
+
+  // 3. Auto-sync from Clerk
   const clerkUser = await clerkClient.users.getUser(userId);
-  const username = clerkUser.username;
+  username = clerkUser.username;
   if (!username) return null;
 
   user = await prisma.user.upsert({
@@ -27,6 +34,8 @@ async function resolveUsername(req) {
     update: { username },
     create: { clerkId: userId, username },
   });
+  
+  await redis.set(`clerk_username:${userId}`, user.username);
   return user.username;
 }
 
@@ -190,6 +199,9 @@ router.post("/", async (req, res) => {
       },
     });
 
+    // Invalidate game history cache
+    await redis.del(`user_games:${username}`);
+
     res.status(201).json({ game });
   } catch (error) {
     console.error("Error saving game:", error);
@@ -206,11 +218,20 @@ router.get("/", async (req, res) => {
     const { userId } = getAuth(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-    if (!user) return res.json({ games: [] });
+    const username = await resolveUsername(req);
+    if (!username) return res.json({ games: [] });
 
+    const cacheKey = `user_games:${username}`;
+    
+    // Check Redis Cache
+    const cachedGames = await redis.get(cacheKey);
+    if (cachedGames !== null) {
+      return res.json({ games: cachedGames });
+    }
+
+    // Cache Miss - Query DB
     const games = await prisma.game.findMany({
-      where: { username: user.username },
+      where: { username },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -223,6 +244,9 @@ router.get("/", async (req, res) => {
         createdAt: true,
       }
     });
+
+    // Cache the result for 1 hour
+    await redis.set(cacheKey, games, { ex: 3600 });
 
     res.json({ games });
   } catch (error) {
