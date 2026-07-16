@@ -54,9 +54,6 @@ export default function PlayStockfish({
   const displayedChess = useMemo(() => {
     if (viewIndex === null) return chess;
     const temp = new Chess();
-    for (const m of activeInitialMovesRef.current) {
-      try { temp.move(m); } catch (e) {}
-    }
     if (viewIndex >= 0) {
       const h = chess.history();
       for (let i = 0; i <= viewIndex; i++) {
@@ -66,8 +63,9 @@ export default function PlayStockfish({
     return temp;
   }, [fen, viewIndex, chess]);
 
-  const displayedFen = useMemo(() => displayedChess.fen(), [displayedChess]);
-  const board = useMemo(() => displayedChess.board(), [displayedFen]); 
+  // Include fen and viewIndex in dependencies to ensure reactivity when the mutable chess object updates
+  const displayedFen = useMemo(() => displayedChess.fen(), [displayedChess, fen, viewIndex]);
+  const board = useMemo(() => displayedChess.board(), [displayedFen, fen, viewIndex]); 
   
   const isRealGameOver = chess.isGameOver();
   const isDisplayedGameOver = displayedChess.isGameOver();
@@ -78,13 +76,13 @@ export default function PlayStockfish({
   const legalTargets = useMemo(() => {
     if (!selected) return [];
     return displayedChess.moves({ square: selected, verbose: true }).map((m) => m.to);
-  }, [selected, displayedChess]); 
+  }, [selected, displayedChess, fen, viewIndex]); 
 
   const lastMoveObj = useMemo(() => {
     const h = displayedChess.history({ verbose: true });
     const last = h[h.length - 1];
     return last ? { from: last.from, to: last.to } : null;
-  }, [displayedFen]); 
+  }, [displayedFen, fen, viewIndex]); 
 
   const checkSquare = useMemo(() => {
     if (!displayedChess.inCheck()) return null;
@@ -346,26 +344,9 @@ export default function PlayStockfish({
         <p className="section-label">TEST YOURSELF</p>
         <h2 className="mt-[10px] text-[clamp(1.7rem,3.4vw,2.4rem)] font-semibold">Play against Stockfish</h2>
 
-        <div className="mt-[44px] grid grid-cols-[30px_minmax(0,560px)_320px] max-[980px]:grid-cols-[minmax(0,560px)] gap-[20px] items-start justify-center">
-          {/* Desktop Vertical Eval Bar */}
-          <div 
-            className={`hidden min-[980px]:flex flex-col h-[min(560px,100%)] bg-[#1c2245] items-center self-stretch border border-ink-3 relative group cursor-pointer ${whiteAtBottom ? 'justify-end' : 'justify-start'}`} 
-            aria-hidden="true"
-          >
-            <div className="w-full bg-[#eef1d8] transition-[height] duration-600 ease" style={{ height: `${evalPct}%` }} />
-            <div className={`absolute left-0 right-0 flex justify-center pointer-events-none ${textAtWinningSide ? 'bottom-[6px]' : 'top-[6px]'}`}>
-              <span className={`text-[12px] font-bold ${isWhiteWinning ? 'text-[#1c2245]' : 'text-[#eef1d8]'}`}>
-                {displayEval}
-              </span>
-            </div>
-            
-            {/* Custom Tooltip */}
-            <div className={`absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 ${isWhiteWinning ? 'bg-[#eef1d8] text-[#1c2245]' : 'bg-[#1c2245] text-[#eef1d8]'} border border-ink-3 font-mono text-[12px] py-[6px] px-[10px] rounded-[6px] opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity duration-200 z-50 shadow-xl`}>
-              {tooltipEval}
-            </div>
-          </div>
-
-          <div className="min-w-0">
+        <div className="mt-[44px] grid grid-cols-[minmax(0,610px)_320px] max-[980px]:grid-cols-[minmax(0,560px)] gap-[20px] items-start justify-center">
+          
+          <div className="min-w-0 flex flex-col">
             {/* Mobile Horizontal Eval Bar */}
             <div 
               className={`min-[980px]:hidden w-full h-[22px] bg-[#1c2245] flex items-stretch border border-ink-3 relative mb-[12px] group cursor-pointer ${whiteAtBottom ? 'flex-row' : 'flex-row-reverse'}`} 
@@ -383,23 +364,50 @@ export default function PlayStockfish({
                 {tooltipEval}
               </div>
             </div>
-            
-            <Chessboard
-              board={board}
-              interactive
-              onSquareClick={handleSquareClick}
-              selected={selected}
-              legalTargets={legalTargets}
-              lastMove={hint || lastMoveObj}
-              checkSquare={checkSquare}
-              orientation={orientation}
-              ariaLabel="Interactive game against Stockfish"
-            />
-            <p className="mt-[18px] font-mono text-[0.82rem] text-mist text-center min-h-[1.2em]" aria-live="polite">
-              {!ready && !error && "Loading engine…"}
-              {Boolean(error) && error}
-              {ready && (engineTurn ? "Stockfish is thinking…" : status)}
-            </p>
+
+            <div className="flex gap-[20px] items-stretch">
+              {/* Desktop Vertical Eval Bar */}
+              <div 
+                className={`hidden min-[980px]:flex flex-col w-[30px] shrink-0 bg-[#1c2245] items-center border border-ink-3 relative group cursor-pointer ${whiteAtBottom ? 'justify-end' : 'justify-start'}`} 
+                aria-hidden="true"
+              >
+                <div className="w-full bg-[#eef1d8] transition-[height] duration-600 ease" style={{ height: `${evalPct}%` }} />
+                <div className={`absolute left-0 right-0 flex justify-center pointer-events-none ${textAtWinningSide ? 'bottom-[6px]' : 'top-[6px]'}`}>
+                  <span className={`text-[12px] font-bold ${isWhiteWinning ? 'text-[#1c2245]' : 'text-[#eef1d8]'}`}>
+                    {displayEval}
+                  </span>
+                </div>
+                
+                {/* Custom Tooltip */}
+                <div className={`absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 ${isWhiteWinning ? 'bg-[#eef1d8] text-[#1c2245]' : 'bg-[#1c2245] text-[#eef1d8]'} border border-ink-3 font-mono text-[12px] py-[6px] px-[10px] rounded-[6px] opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity duration-200 z-50 shadow-xl`}>
+                  {tooltipEval}
+                </div>
+              </div>
+
+              {/* Chessboard */}
+              <div className="flex-1 min-w-0">
+                <Chessboard
+                  board={board}
+                  interactive
+                  onSquareClick={handleSquareClick}
+                  selected={selected}
+                  legalTargets={legalTargets}
+                  lastMove={hint || lastMoveObj}
+                  checkSquare={checkSquare}
+                  orientation={orientation}
+                  ariaLabel="Interactive game against Stockfish"
+                />
+              </div>
+            </div>
+
+            <div className="min-[980px]:ml-[50px]">
+              <p className="mt-[18px] font-mono text-[0.82rem] text-mist text-center min-h-[1.2em]" aria-live="polite">
+                {!ready && !error && "Loading engine…"}
+                {Boolean(error) && error}
+                {ready && (engineTurn ? "Stockfish is thinking…" : status)}
+              </p>
+            </div>
+
             {saveStatus && (
               <p className={`mt-[6px] font-mono text-[0.75rem] text-center flex items-center justify-center gap-[6px] ${
                 saveStatus === "saved" ? "text-green-400" : saveStatus === "error" ? "text-red-400" : "text-mist"
