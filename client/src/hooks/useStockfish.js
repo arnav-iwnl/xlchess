@@ -79,6 +79,16 @@ export function useStockfish() {
     };
   }, []);
 
+  const requestEvaluation = useCallback((fen) => {
+    const worker = workerRef.current;
+    if (!worker || pendingRef.current) return;
+    // Stop any existing background search before starting a new one
+    worker.postMessage("stop");
+    worker.postMessage(`position fen ${fen}`);
+    // Run a quick search to get an updated evaluation score
+    worker.postMessage(`go depth 8`);
+  }, []);
+
   /** Resolves with a UCI move string (e.g. "e2e4", "e7e8q") or null. */
   const requestBestMove = useCallback((fen, { skill = 9, movetime = 800 } = {}) => {
     return new Promise((resolve) => {
@@ -92,5 +102,5 @@ export function useStockfish() {
     });
   }, []);
 
-  return { ready, error, thinking, requestBestMove, scoreCp, scoreMate };
+  return { ready, error, thinking, requestBestMove, requestEvaluation, scoreCp, scoreMate };
 }

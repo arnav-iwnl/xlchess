@@ -14,7 +14,7 @@ export default function PlayStockfish({
   initialOrientation = "white",
   resumeGameId = null
 }) {
-  const { ready, error, requestBestMove, scoreCp, scoreMate } = useStockfish();
+  const { ready, error, requestBestMove, requestEvaluation, scoreCp, scoreMate } = useStockfish();
   const { isSignedIn } = useUser();
   
   const gameRef = useRef(null);
@@ -36,6 +36,7 @@ export default function PlayStockfish({
   const [hint, setHint] = useState(null);
   const [engineTurn, setEngineTurn] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
+  const [viewIndex, setViewIndex] = useState(null);
   
   // Track the initial state locally so we can clear it if the user hits "Reset"
   const activeInitialMovesRef = useRef(initialMoves);
@@ -48,35 +49,53 @@ export default function PlayStockfish({
   const difficulty = DIFFICULTIES[difficultyIdx];
 
   const chess = gameRef.current;
-  const board = useMemo(() => chess.board(), [fen]); // eslint-disable-line react-hooks/exhaustive-deps
   const history = useMemo(() => chess.history(), [fen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const gameOver = chess.isGameOver();
-  const status = describeStatus(chess, gameOver);
+  const displayedChess = useMemo(() => {
+    if (viewIndex === null) return chess;
+    const temp = new Chess();
+    for (const m of activeInitialMovesRef.current) {
+      try { temp.move(m); } catch (e) {}
+    }
+    if (viewIndex >= 0) {
+      const h = chess.history();
+      for (let i = 0; i <= viewIndex; i++) {
+        if (h[i]) temp.move(h[i]);
+      }
+    }
+    return temp;
+  }, [fen, viewIndex, chess]);
+
+  const displayedFen = useMemo(() => displayedChess.fen(), [displayedChess]);
+  const board = useMemo(() => displayedChess.board(), [displayedFen]); 
+  
+  const isRealGameOver = chess.isGameOver();
+  const isDisplayedGameOver = displayedChess.isGameOver();
+  const status = describeStatus(displayedChess, isDisplayedGameOver);
 
   const useCaching = enableCaching && isSignedIn;
 
   const legalTargets = useMemo(() => {
     if (!selected) return [];
-    return chess.moves({ square: selected, verbose: true }).map((m) => m.to);
-  }, [selected, chess, fen]); // eslint-disable-line react-hooks/exhaustive-deps
+    return displayedChess.moves({ square: selected, verbose: true }).map((m) => m.to);
+  }, [selected, displayedChess]); 
 
   const lastMoveObj = useMemo(() => {
-    const h = chess.history({ verbose: true });
+    const h = displayedChess.history({ verbose: true });
     const last = h[h.length - 1];
     return last ? { from: last.from, to: last.to } : null;
-  }, [fen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayedFen]); 
 
   const checkSquare = useMemo(() => {
-    if (!chess.inCheck()) return null;
-    const turn = chess.turn();
-    for (const row of chess.board()) {
+    if (!displayedChess.inCheck()) return null;
+    const turn = displayedChess.turn();
+    for (const row of displayedChess.board()) {
       for (const p of row) {
         if (p && p.type === "k" && p.color === turn) return p.square;
       }
     }
     return null;
-  }, [fen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayedFen]); 
 
   // Start a Redis game session when caching is enabled and first move is made
   async function ensureSession() {
@@ -120,6 +139,7 @@ export default function PlayStockfish({
       try {
         const move = chess.move({ from, to, promotion });
         setFen(chess.fen());
+        setViewIndex(null);
         // Cache the engine's move to Redis
         if (move) cacheMoveToRedis(move.san);
       } catch {
@@ -149,15 +169,27 @@ export default function PlayStockfish({
   }
 
   function handleSquareClick(sq) {
-    if (engineTurn || gameOver || !ready) return;
-    const piece = chess.get(sq);
+    if (engineTurn || isDisplayedGameOver || !ready) return;
+    if (displayedChess.turn() !== "w") {
+      setSelected(null);
+      return;
+    }
+
+    const piece = displayedChess.get(sq);
 
     if (selected) {
       if (legalTargets.includes(sq)) {
+        if (viewIndex !== null) {
+          const targetLength = viewIndex + 1;
+          while (chess.history().length > targetLength) {
+            chess.undo();
+          }
+          setViewIndex(null);
+        }
         applyPlayerMove(selected, sq);
         return;
       }
-      if (piece && piece.color === chess.turn()) {
+      if (piece && piece.color === displayedChess.turn()) {
         setSelected(sq);
         return;
       }
@@ -165,19 +197,26 @@ export default function PlayStockfish({
       return;
     }
 
-    if (piece && piece.color === chess.turn()) {
+    if (piece && piece.color === displayedChess.turn()) {
       setSelected(sq);
     }
   }
 
   // Trigger the engine whenever it becomes Black's turn (engine plays Black).
   useEffect(() => {
-    if (gameOver) return;
-    if (chess.turn() === "b") {
+    if (!ready) return;
+    if (chess.turn() === "b" && !chess.isGameOver()) {
       const t = setTimeout(requestEngineMove, 350);
       return () => clearTimeout(t);
-    }
-  }, [fen, gameOver, chess, requestEngineMove]);
+    } 
+  }, [fen, ready, chess, requestEngineMove]);
+
+  // Trigger evaluation whenever displayedFEN changes
+  useEffect(() => {
+    if (!ready) return;
+    evalSideRef.current = displayedChess.turn();
+    requestEvaluation(displayedFen);
+  }, [displayedFen, ready, requestEvaluation, displayedChess]);
 
   function handleUndo() {
     // Undo both the engine's reply and the player's move so it's always
@@ -242,6 +281,7 @@ export default function PlayStockfish({
     setFen(gameRef.current.fen());
     setSelected(null);
     setHint(null);
+    setViewIndex(null);
     // Clear save status after a short delay for visual feedback
     setTimeout(() => setSaveStatus(null), 2000);
     trackEvent("play_reset");
@@ -249,7 +289,7 @@ export default function PlayStockfish({
 
   // Auto-flush game from Redis → NeonDB when it ends (only when caching is active)
   useEffect(() => {
-    if (!gameOver || !useCaching || lastSavedMoveCount.current === history.length) return;
+    if (!isRealGameOver || !useCaching || lastSavedMoveCount.current === history.length) return;
     if (history.length === 0 || !sessionIdRef.current) return;
 
     lastSavedMoveCount.current = history.length;
@@ -267,13 +307,13 @@ export default function PlayStockfish({
         window.dispatchEvent(new Event("gameSaved"));
       })
       .catch(() => setSaveStatus("error"));
-  }, [gameOver, useCaching, history, chess]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isRealGameOver, useCaching, history, chess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleHint() {
-    if (engineTurn || gameOver || chess.turn() !== "w") return;
+    if (engineTurn || isDisplayedGameOver || displayedChess.turn() !== "w") return;
     trackEvent("play_hint");
     evalSideRef.current = "w";
-    const uci = await requestBestMove(chess.fen(), { skill: 18, movetime: 500 });
+    const uci = await requestBestMove(displayedFen, { skill: 18, movetime: 500 });
     if (uci) {
       setHint({ from: uci.slice(0, 2), to: uci.slice(2, 4) });
       setTimeout(() => setHint(null), 2500);
@@ -288,9 +328,17 @@ export default function PlayStockfish({
   const evalClamped = Math.max(-6, Math.min(6, evalPawns));
   const evalPct = 50 + (evalClamped / 6) * 50;
 
+  const isWhiteWinning = evalPawns >= 0;
+  const whiteAtBottom = orientation === "white";
+  const textAtWinningSide = isWhiteWinning === whiteAtBottom;
+
   const displayEval = scoreMate !== null 
     ? `M${Math.abs(scoreMate)}` 
-    : (evalPawns > 0 ? "+" : "") + evalPawns.toFixed(1);
+    : Math.abs(evalPawns).toFixed(1);
+
+  const tooltipEval = scoreMate !== null
+    ? `Mate in ${Math.abs(scoreMate)}`
+    : (evalPawns > 0 ? "+" : "") + evalPawns.toFixed(2);
 
   return (
     <div id="play" className="pt-[16px] pb-[32px] w-full">
@@ -298,24 +346,42 @@ export default function PlayStockfish({
         <p className="section-label">TEST YOURSELF</p>
         <h2 className="mt-[10px] text-[clamp(1.7rem,3.4vw,2.4rem)] font-semibold">Play against Stockfish</h2>
 
-        <div className="mt-[44px] grid grid-cols-[14px_minmax(0,560px)_320px] max-[980px]:grid-cols-[minmax(0,560px)] gap-[20px] items-start justify-center">
+        <div className="mt-[44px] grid grid-cols-[30px_minmax(0,560px)_320px] max-[980px]:grid-cols-[minmax(0,560px)] gap-[20px] items-start justify-center">
           {/* Desktop Vertical Eval Bar */}
-          <div className="hidden min-[980px]:flex flex-col h-[min(560px,100%)] rounded-[7px] bg-[#1c2245] overflow-hidden items-end self-stretch border border-ink-3 relative" aria-hidden="true">
+          <div 
+            className={`hidden min-[980px]:flex flex-col h-[min(560px,100%)] bg-[#1c2245] items-center self-stretch border border-ink-3 relative group cursor-pointer ${whiteAtBottom ? 'justify-end' : 'justify-start'}`} 
+            aria-hidden="true"
+          >
             <div className="w-full bg-[#eef1d8] transition-[height] duration-600 ease" style={{ height: `${evalPct}%` }} />
-            <div className="absolute inset-0 flex items-center justify-center z-10 mix-blend-difference pointer-events-none overflow-visible">
-              <span className="text-[0.65rem] font-mono text-white -rotate-90 whitespace-nowrap">
+            <div className={`absolute left-0 right-0 flex justify-center pointer-events-none ${textAtWinningSide ? 'bottom-[6px]' : 'top-[6px]'}`}>
+              <span className={`text-[12px] font-bold ${isWhiteWinning ? 'text-[#1c2245]' : 'text-[#eef1d8]'}`}>
                 {displayEval}
               </span>
+            </div>
+            
+            {/* Custom Tooltip */}
+            <div className={`absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 ${isWhiteWinning ? 'bg-[#eef1d8] text-[#1c2245]' : 'bg-[#1c2245] text-[#eef1d8]'} border border-ink-3 font-mono text-[12px] py-[6px] px-[10px] rounded-[6px] opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity duration-200 z-50 shadow-xl`}>
+              {tooltipEval}
             </div>
           </div>
 
           <div className="min-w-0">
             {/* Mobile Horizontal Eval Bar */}
-            <div className="min-[980px]:hidden w-full h-[18px] rounded-[7px] bg-[#1c2245] overflow-hidden flex items-stretch border border-ink-3 relative mb-[12px]" aria-hidden="true">
+            <div 
+              className={`min-[980px]:hidden w-full h-[22px] bg-[#1c2245] flex items-stretch border border-ink-3 relative mb-[12px] group cursor-pointer ${whiteAtBottom ? 'flex-row' : 'flex-row-reverse'}`} 
+              aria-hidden="true"
+            >
               <div className="bg-[#eef1d8] transition-[width] duration-600 ease" style={{ width: `${evalPct}%` }} />
-              <span className="absolute inset-0 flex items-center justify-center text-[0.7rem] font-mono z-10 mix-blend-difference text-white pointer-events-none">
-                {displayEval}
-              </span>
+              <div className={`absolute top-0 bottom-0 flex items-center pointer-events-none px-[6px] ${textAtWinningSide ? 'left-0' : 'right-0'}`}>
+                <span className={`text-[12px] font-bold ${isWhiteWinning ? 'text-[#1c2245]' : 'text-[#eef1d8]'}`}>
+                  {displayEval}
+                </span>
+              </div>
+              
+              {/* Custom Tooltip */}
+              <div className={`absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 ${isWhiteWinning ? 'bg-[#eef1d8] text-[#1c2245]' : 'bg-[#1c2245] text-[#eef1d8]'} border border-ink-3 font-mono text-[12px] py-[6px] px-[10px] rounded-[6px] opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity duration-200 z-50 shadow-xl`}>
+                {tooltipEval}
+              </div>
             </div>
             
             <Chessboard
@@ -367,7 +433,7 @@ export default function PlayStockfish({
             </div>
 
             <div className="grid grid-cols-2 gap-[10px]">
-              <button className="btn btn-ghost justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" onClick={handleHint} disabled={engineTurn || gameOver}>
+              <button className="btn btn-ghost justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" onClick={handleHint} disabled={engineTurn || isDisplayedGameOver}>
                 <FiZap /> Hint
               </button>
               <button className="btn btn-ghost justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" onClick={handleUndo} disabled={engineTurn || history.length === 0}>
@@ -400,13 +466,25 @@ export default function PlayStockfish({
                 <p className="mt-[15px] text-[0.85rem] text-mist leading-[1.5]">No moves yet. You're playing White — make a move on the board.</p>
               ) : (
                 <ol className="mt-[15px] mb-0 mx-0 p-0 list-none font-mono text-[0.85rem]">
-                  {chunk(history).map(([n, w, b]) => (
-                    <li key={n} className="grid grid-cols-[26px_1fr_1fr] gap-[6px] py-[3px] px-0">
-                      <span className="text-mist">{n}.</span>
-                      <span>{w}</span>
-                      <span>{b || ""}</span>
-                    </li>
-                  ))}
+                  {chunk(history).map(([n, w, b, wIdx, bIdx]) => {
+                    const isWActive = viewIndex === wIdx || (viewIndex === null && wIdx === history.length - 1);
+                    const isBActive = viewIndex === bIdx || (viewIndex === null && bIdx === history.length - 1);
+                    return (
+                      <li key={n} className="grid grid-cols-[26px_1fr_1fr] gap-[6px] py-[3px] px-0">
+                        <span className="text-mist">{n}.</span>
+                        <span 
+                          className={`cursor-pointer hover:bg-ink-3 rounded px-1 -ml-1 transition-colors ${isWActive ? 'bg-ink-3 text-white' : ''}`}
+                          onClick={() => setViewIndex(wIdx === history.length - 1 ? null : wIdx)}
+                        >{w}</span>
+                        {b ? (
+                          <span 
+                            className={`cursor-pointer hover:bg-ink-3 rounded px-1 -ml-1 transition-colors ${isBActive ? 'bg-ink-3 text-white' : ''}`}
+                            onClick={() => setViewIndex(bIdx === history.length - 1 ? null : bIdx)}
+                          >{b}</span>
+                        ) : <span />}
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </div>
@@ -419,7 +497,7 @@ export default function PlayStockfish({
 
 function chunk(moves) {
   const rows = [];
-  for (let i = 0; i < moves.length; i += 2) rows.push([i / 2 + 1, moves[i], moves[i + 1]]);
+  for (let i = 0; i < moves.length; i += 2) rows.push([i / 2 + 1, moves[i], moves[i + 1], i, i + 1]);
   return rows;
 }
 
