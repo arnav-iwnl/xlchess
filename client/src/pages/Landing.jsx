@@ -1,4 +1,5 @@
 import { useEffect, useState, lazy, Suspense, useRef } from "react";
+import { useClerk } from "@clerk/clerk-react";
 import Hero from "../components/Hero";
 
 const FamousGames = lazy(() => import("../components/FamousGames"));
@@ -33,6 +34,21 @@ function LazySection({ children, minHeight = "50vh" }) {
 }
 
 export default function Landing() {
+  const clerk = useClerk();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    
+    if (params.get("ref")) {
+      localStorage.setItem("xlchess_referral", params.get("ref"));
+    }
+
+    if (params.get("signup") === "true") {
+      setTimeout(() => clerk.openSignUp(), 100);
+      window.history.replaceState(null, "", "/"); // clean URL
+    }
+  }, [clerk]);
+
   return (
     <>
       <main id="main">

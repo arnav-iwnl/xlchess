@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { FiPlay, FiPause, FiSkipBack, FiSkipForward, FiRewind } from "react-icons/fi";
 import Chessboard from "./Chessboard";
+import { useThemes } from "../hooks/useBoardTheme";
 import { famousGames } from "../data/famousGames";
 import { trackEvent } from "../lib/analytics";
 
@@ -12,6 +13,7 @@ export default function FamousGames() {
   const [moveIndex, setMoveIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const listRef = useRef(null);
+  const { boardTheme, pieceSet } = useThemes();
 
   const game = useMemo(() => famousGames.find((g) => g.id === activeId), [activeId]);
   const totalMoves = game.moves.length;
@@ -85,7 +87,7 @@ export default function FamousGames() {
           </ul>
 
           <div className="min-w-0">
-            <Chessboard board={board} lastMove={lastMove} checkSquare={checkSquare} ariaLabel={`${game.title}, move ${moveIndex} of ${totalMoves}`} />
+            <Chessboard board={board} lastMove={lastMove} checkSquare={checkSquare} boardTheme={boardTheme} pieceTheme={pieceSet} ariaLabel={`${game.title}, move ${moveIndex} of ${totalMoves}`} />
 
             <div className="mt-[14px] flex items-center gap-[10px]">
               <button className="w-[34px] h-[34px] rounded-full border border-line bg-transparent text-paper flex items-center justify-center cursor-pointer flex-none transition-colors duration-150 hover:border-violet-2 hover:bg-[rgba(139,123,240,0.1)]" aria-label="Restart" onClick={() => { setMoveIndex(0); setPlaying(false); }}>

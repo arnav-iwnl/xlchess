@@ -4,6 +4,7 @@ import { Chess } from "chess.js";
 import { FiClock, FiPlay, FiPause, FiRotateCcw, FiChevronLeft } from "react-icons/fi";
 import Chessboard from "./Chessboard";
 import { getGames } from "../lib/api";
+import { useThemes } from "../hooks/useBoardTheme";
 
 const STEP_MS = 900;
 
@@ -95,37 +96,47 @@ export default function GameHistory({ compact = false, onGameSelect }) {
 
 function GameCard({ game, onClick, compact }) {
   const date = new Date(game.createdAt);
-  const resultLabel = {
-    white_win: "Victory",
-    black_win: "Defeat",
-    draw: "Draw",
-  }[game.result] || game.result;
-
-  const resultColor = {
-    white_win: "text-green-400",
-    black_win: "text-red-400",
-    draw: "text-yellow-400",
-  }[game.result] || "text-mist";
+  
+  const isPlaying = game.result === "playing";
+  
+  let resultLabel = game.result;
+  let resultColor = "text-mist";
+  
+  if (game.result === "playing") {
+    resultLabel = "In Progress";
+    resultColor = "text-blue-400 animate-pulse";
+  } else if (game.result === "draw") {
+    resultLabel = "Draw";
+    resultColor = "text-yellow-400";
+  } else if (game.result === `${game.playerColor}_win`) {
+    resultLabel = "Victory";
+    resultColor = "text-green-400";
+  } else if (game.result === "white_win" || game.result === "black_win") {
+    resultLabel = "Defeat";
+    resultColor = "text-red-400";
+  }
 
   const formattedDate = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   const formattedTime = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  
+  const opponentName = game.isPvP ? game.opponent : `Stockfish (${game.difficulty})`;
 
   return (
     <button
       onClick={onClick}
-      className={`w-full bg-ink border border-ink-3 rounded-[12px] text-left cursor-pointer transition-all duration-200 hover:border-violet/50 hover:bg-ink-2/80 group ${
+      className={`w-full bg-ink border ${isPlaying ? 'border-blue-500/50' : 'border-ink-3'} rounded-[12px] text-left cursor-pointer transition-all duration-200 hover:border-violet/50 hover:bg-ink-2/80 group ${
         compact ? 'p-[12px]' : 'p-[18px] flex items-center gap-[18px]'
       }`}
     >
       {!compact && (
-        <div className="w-[48px] h-[48px] rounded-[12px] bg-ink-3 flex items-center justify-center text-[1.4rem] flex-none group-hover:bg-violet/20 transition-colors duration-200">
-          ♟
+        <div className={`w-[48px] h-[48px] rounded-[12px] bg-ink-3 flex items-center justify-center text-[1.4rem] flex-none transition-colors duration-200 ${isPlaying ? 'bg-blue-500/20 text-blue-400' : 'group-hover:bg-violet/20'}`}>
+          {isPlaying ? <FiClock /> : "♟"}
         </div>
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-[10px]">
           <span className={`font-display font-semibold ${compact ? 'text-[0.85rem]' : 'text-[0.95rem]'} text-paper truncate`}>
-            {formattedTime} {formattedDate}. {game.username} vs Stockfish ({game.difficulty})
+            {formattedTime} {formattedDate}. vs {opponentName}
           </span>
         </div>
         <div className={`mt-[4px] flex items-center gap-[10px] text-mist ${compact ? 'text-[0.72rem] flex-wrap' : 'text-[0.8rem]'}`}>
@@ -136,7 +147,11 @@ function GameCard({ game, onClick, compact }) {
           <span>{game.playerColor}</span>
         </div>
       </div>
-      {!compact && <FiPlay className="text-mist group-hover:text-violet-2 transition-colors duration-200 flex-none" />}
+      {!compact && (
+        isPlaying 
+          ? <span className="text-blue-400 text-[0.85rem] font-semibold group-hover:text-blue-300 transition-colors duration-200 flex-none mr-2">Rejoin</span> 
+          : <FiPlay className="text-mist group-hover:text-violet-2 transition-colors duration-200 flex-none" />
+      )}
     </button>
   );
 }
@@ -144,6 +159,7 @@ function GameCard({ game, onClick, compact }) {
 export function GameReplay({ game, onBack, onResume }) {
   const [moveIndex, setMoveIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const { boardTheme, pieceSet } = useThemes();
   const totalMoves = game.moves.length;
 
   const { board, lastMove } = useMemo(() => {
@@ -218,6 +234,8 @@ export function GameReplay({ game, onBack, onResume }) {
               board={board}
               lastMove={lastMove}
               orientation={game.playerColor}
+              boardTheme={boardTheme}
+              pieceTheme={pieceSet}
               ariaLabel={`Game replay — move ${moveIndex} of ${totalMoves}`}
             />
 

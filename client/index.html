@@ -3,16 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/knight.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta property="og:title" content="XLChess — Excel at Chess" />
+    <meta property="og:description" content="Play chess against Stockfish, track your stats, and challenge friends." />
+    <meta property="og:image" content="https://xlchess.com/og-image.png" />
+    <meta property="og:url" content="https://xlchess.com" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#0b1024" />
     <meta name="description" content="XLChess — a complete chess platform to play, learn, compete, and grow. Play against Stockfish, replay legendary games, and track your progress." />
     <title>XLChess — Excel at Chess</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" crossorigin="anonymous" />
     <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" crossorigin="anonymous" />
     </noscript>
     <!-- Google tag (gtag.js) - Deferred -->
     <script>
@@ -37,6 +42,8 @@
       });
       setTimeout(loadGTM, 3500);
     </script>
+    <!-- Razorpay Checkout -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { motion } from "framer-motion";
 import { FiPlay, FiPause, FiRotateCcw } from "react-icons/fi";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import Chessboard from "./Chessboard";
+import { useThemes } from "../hooks/useBoardTheme";
 import { famousGames } from "../data/famousGames";
 import { trackEvent } from "../lib/analytics";
 
@@ -13,6 +14,8 @@ const STEP_MS = 1100;
 
 export default function Hero() {
   const { isSignedIn } = useUser();
+  const navigate = useNavigate();
+  const { boardTheme, pieceSet } = useThemes();
   const [moveIndex, setMoveIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const chessRef = useRef(new Chess());
@@ -103,8 +106,10 @@ export default function Hero() {
         >
           <Chessboard
             board={board}
-            lastMove={lastMove}
-            ariaLabel={`${FEATURED.title} — move ${moveIndex} of ${totalMoves}`}
+            boardTheme={boardTheme}
+            pieceTheme={pieceSet}
+            interactive={false}
+            ariaLabel="Decorative chessboard"
           />
           <div className="flex items-end justify-between mt-[16px]">
             <div>

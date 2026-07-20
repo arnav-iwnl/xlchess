@@ -14,6 +14,35 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   games     Game[]
+
+  // Profile & Economy
+  xlCoins     Int      @default(0)
+  boardTheme  String   @default("classic")
+  pieceSet    String   @default("standard")
+  ownedThemes String[] @default(["classic"])
+  ownedPieces String[] @default(["standard"])
+
+  // XP & Leveling
+  xp    Int @default(0)
+  level Int @default(1)
+
+  // Rating (Elo)
+  rating      Int @default(1200)
+  ratingPeak  Int @default(1200)
+  ratingGames Int @default(0)
+
+  // Referrals
+  referralCode     String    @unique @default(cuid())
+  referredBy       String?
+  referralsMade    Referral[] @relation("Referrer")
+  referralReceived Referral?  @relation("Referred")
+
+  // PvP Relations
+  pvpGamesWhite PvPGame[] @relation("WhitePlayer")
+  pvpGamesBlack PvPGame[] @relation("BlackPlayer")
+
+  // Achievements
+  achievements UserAchievement[]
 }
 
 model Game {
@@ -30,4 +59,68 @@ model Game {
   user User @relation(fields: [username], references: [username])
 
   @@index([username])
+}
+
+model PvPGame {
+  id                String    @id @default(cuid())
+  whiteUserId       String
+  blackUserId       String
+  moves             String[]
+  result            String    // "white_win", "black_win", "draw", "abandoned"
+  timeControl       String    // "5+0", "10+0", "15+10"
+  totalMoves        Int
+  whiteRatingBefore Int
+  blackRatingBefore Int
+  whiteRatingAfter  Int
+  blackRatingAfter  Int
+  challengeCode     String?   @unique
+  createdAt         DateTime  @default(now())
+  endedAt           DateTime?
+
+  white User @relation("WhitePlayer", fields: [whiteUserId], references: [id])
+  black User @relation("BlackPlayer", fields: [blackUserId], references: [id])
+
+  @@index([whiteUserId])
+  @@index([blackUserId])
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  description String
+  icon        String
+  category    String // "pvp", "puzzle", "social", "mastery", "volume"
+  xpReward    Int    @default(50)
+  coinReward  Int    @default(0)
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model Referral {
+  id             String    @id @default(cuid())
+  referrerUserId String
+  referredUserId String    @unique
+  qualified      Boolean   @default(false)
+  coinsAwarded   Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  qualifiedAt    DateTime?
+
+  referrer User @relation("Referrer", fields: [referrerUserId], references: [id])
+  referred User @relation("Referred", fields: [referredUserId], references: [id])
+
+  @@index([referrerUserId])
 }

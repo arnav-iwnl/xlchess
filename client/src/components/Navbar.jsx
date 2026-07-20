@@ -10,7 +10,7 @@ import {
   useUser,
   useClerk,
 } from "@clerk/clerk-react";
-import { setTokenGetter, syncUser } from "../lib/api";
+import { setTokenGetter, syncUser, apiFetch } from "../lib/api";
 
 const LANDING_LINKS = [
   { href: "#games", label: "Famous Games" },
@@ -28,24 +28,9 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isHome = location.pathname === "/home";
+  const isAppRoute = ["/home", "/stats", "/leaderboard"].includes(location.pathname) || location.pathname.startsWith("/challenge/");
 
-  // Preload Clerk's authentication chunks to make the modal open instantly
-  useEffect(() => {
-    if (clerk && !isSignedIn) {
-      const dummyDiv = document.createElement("div");
-      dummyDiv.style.display = "none";
-      try {
-        clerk.mountSignIn(dummyDiv, { routing: "virtual" });
-        // The script fetch has started; unmount quickly to avoid duplicate mount errors later
-        setTimeout(() => {
-          clerk.unmountSignIn(dummyDiv);
-        }, 100);
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-  }, [clerk, isSignedIn]);
+  // Removed hacky Clerk preload logic that caused massive console warnings
 
   // Register the Clerk token getter for the API layer
   useEffect(() => {
@@ -55,9 +40,20 @@ export default function Navbar() {
   // Sync user to our DB when they sign in
   useEffect(() => {
     if (isSignedIn && user?.username) {
-      syncUser().catch((err) =>
-        console.warn("User sync failed:", err.message)
-      );
+      syncUser()
+        .then(() => {
+          // Check for pending referral
+          const refCode = localStorage.getItem("xlchess_referral");
+          if (refCode) {
+            apiFetch("/api/referrals/apply", {
+              method: "POST",
+              body: JSON.stringify({ referralCode: refCode }),
+            })
+              .then(() => localStorage.removeItem("xlchess_referral"))
+              .catch((e) => console.warn("Referral apply failed:", e));
+          }
+        })
+        .catch((err) => console.warn("User sync failed:", err.message));
     }
   }, [isSignedIn, user?.username]);
 
@@ -97,16 +93,24 @@ export default function Navbar() {
 
         {/* Desktop Nav */}
         <nav className="hidden max-[860px]:hidden min-[861px]:flex gap-[28px] text-[0.92rem]" aria-label="Primary">
-          {isHome ? (
+          {isAppRoute ? (
             <>
-              <Link to="/home" className="text-mist transition-colors duration-150 hover:text-paper">Play</Link>
+              <Link to="/home" className="text-paper transition-colors duration-150 hover:text-violet-2">Play</Link>
+              <Link to="/stats" className="text-paper transition-colors duration-150 hover:text-violet-2">Stats</Link>
+              <Link to="/leaderboard" className="text-paper transition-colors duration-150 hover:text-violet-2">Leaderboard</Link>
+              <button 
+                onClick={() => window.dispatchEvent(new Event('openThemeStore'))}
+                className="bg-transparent border-none cursor-pointer p-0 font-body text-[0.92rem] text-gold font-bold transition-colors duration-150 hover:text-yellow-400"
+              >
+                Store
+              </button>
               <button 
                 onClick={() => window.dispatchEvent(new Event('toggleHistorySidebar'))}
-                className="bg-transparent border-none cursor-pointer p-0 font-body text-[0.92rem] text-mist transition-colors duration-150 hover:text-paper"
+                className="bg-transparent border-none cursor-pointer p-0 font-body text-[0.92rem] text-paper transition-colors duration-150 hover:text-violet-2"
               >
                 History
               </button>
-              <Link to="/" className="text-mist transition-colors duration-150 hover:text-paper">Landing</Link>
+              <Link to="/" className="text-paper transition-colors duration-150 hover:text-violet-2">Landing</Link>
             </>
           ) : (
             <>
@@ -158,9 +162,20 @@ export default function Navbar() {
       {/* Mobile menu */}
       {open && (
         <nav id="xl-mobile-menu" className="flex flex-col gap-[4px] px-[24px] pt-[10px] pb-[20px] bg-[#0b1024]/98 border-b border-line min-[861px]:hidden" aria-label="Mobile">
-          {isHome ? (
+          {isAppRoute ? (
             <>
               <Link to="/home" className="py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline" onClick={() => setOpen(false)}>Play</Link>
+              <Link to="/stats" className="py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline" onClick={() => setOpen(false)}>Stats</Link>
+              <Link to="/leaderboard" className="py-[12px] px-[4px] text-paper border-b border-line text-[0.95rem] no-underline" onClick={() => setOpen(false)}>Leaderboard</Link>
+              <button 
+                onClick={() => {
+                  window.dispatchEvent(new Event('openThemeStore'));
+                  setOpen(false);
+                }}
+                className="text-left bg-transparent border-none cursor-pointer p-0 font-body py-[12px] px-[4px] text-gold font-bold border-b border-line text-[0.95rem]"
+              >
+                Store
+              </button>
               <button 
                 onClick={() => {
                   setOpen(false);
@@ -192,7 +207,7 @@ export default function Navbar() {
             </div>
           </SignedOut>
           <SignedIn>
-            {!isHome && (
+            {!isAppRoute && (
               <Link to="/home" className="btn btn-primary mt-[12px] justify-center no-underline" onClick={() => setOpen(false)}>
                 Dashboard
               </Link>

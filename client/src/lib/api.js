@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -86,6 +86,22 @@ export async function flushGame(sessionId, result, endSession = true) {
     endSession,
   });
   return data;
+}
+
+export async function apiFetch(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...options.headers };
+  if (getToken) {
+    try {
+      const token = await getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    } catch {}
+  }
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
 export default api;

@@ -4,6 +4,8 @@ import { getAuth, clerkClient } from "@clerk/express";
 import prisma from "../lib/prisma.js";
 import redis from "../lib/redis.js";
 import { flushSessionToDb } from "../lib/inactivityMonitor.js";
+import { onAiGameSaved } from "../lib/postGameHooks.js";
+import { activeGames } from "../lib/socket.js";
 
 const router = Router();
 
@@ -202,6 +204,10 @@ router.post("/", async (req, res) => {
     // Invalidate game history cache
     await redis.del(`user_games:${username}`);
 
+    // Run post-game hooks asynchronously
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (user) onAiGameSaved(game.id, user.id);
+
     res.status(201).json({ game });
   } catch (error) {
     console.error("Error saving game:", error);
@@ -212,46 +218,139 @@ router.post("/", async (req, res) => {
 /**
  * GET /api/games
  * Get all games for the authenticated user, sorted by most recent first.
+ * Now includes AI games, completed PvP games, and active Live PvP games.
  */
 router.get("/", async (req, res) => {
   try {
     const { userId } = getAuth(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const username = await resolveUsername(req);
-    if (!username) return res.json({ games: [] });
+    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const cacheKey = `user_games:${username}`;
+    const username = user.username;
     
-    // Check Redis Cache
+    // 1. Fetch AI Games (cached)
+    const cacheKey = `user_games:${username}`;
+    let aiGames = [];
     const cachedGames = await redis.get(cacheKey);
     if (cachedGames !== null) {
-      return res.json({ games: cachedGames });
+      try {
+        aiGames = typeof cachedGames === "string" ? JSON.parse(cachedGames) : cachedGames;
+      } catch (e) {
+        await redis.del(cacheKey);
+      }
+    }
+    
+    if (aiGames.length === 0) {
+      aiGames = await prisma.game.findMany({
+        where: { username },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          sessionId: true,
+          username: true,
+          result: true,
+          difficulty: true,
+          playerColor: true,
+          totalMoves: true,
+          createdAt: true,
+        }
+      });
+      await redis.set(cacheKey, aiGames, { ex: 3600 });
     }
 
-    // Cache Miss - Query DB
-    const games = await prisma.game.findMany({
-      where: { username },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        sessionId: true,
-        username: true,
-        result: true,
-        difficulty: true,
-        playerColor: true,
-        totalMoves: true,
-        createdAt: true,
-      }
+    // Map AI games to consistent format
+    let allGames = aiGames.map(g => ({
+      ...g,
+      isPvP: false
+    }));
+
+    // 2. Fetch completed PvP Games
+    const pvpGames = await prisma.pvPGame.findMany({
+      where: {
+        OR: [
+          { whiteUserId: user.id },
+          { blackUserId: user.id }
+        ]
+      },
+      include: {
+        white: { select: { username: true } },
+        black: { select: { username: true } }
+      },
+      orderBy: { createdAt: "desc" }
     });
 
-    // Cache the result for 1 hour
-    await redis.set(cacheKey, games, { ex: 3600 });
+    const formattedPvPGames = pvpGames.map(g => {
+      const isWhite = g.whiteUserId === user.id;
+      return {
+        id: g.id,
+        isPvP: true,
+        result: g.result,
+        playerColor: isWhite ? "white" : "black",
+        opponent: isWhite ? g.black.username : g.white.username,
+        totalMoves: g.totalMoves,
+        createdAt: g.createdAt,
+        challengeCode: g.challengeCode
+      };
+    });
+    
+    allGames = [...allGames, ...formattedPvPGames];
 
-    res.json({ games });
+    // 3. Fetch Active PvP Games from memory
+    const activeUserGames = [];
+    for (const [gameId, game] of activeGames.entries()) {
+      if (game.white.userId === user.id || game.black.userId === user.id) {
+        const isWhite = game.white.userId === user.id;
+        activeUserGames.push({
+          id: gameId,
+          isPvP: true,
+          result: "playing",
+          playerColor: isWhite ? "white" : "black",
+          opponent: isWhite ? game.black.username : game.white.username,
+          totalMoves: game.moves ? game.moves.length : 0,
+          createdAt: game.createdAt ? new Date(game.createdAt) : new Date(),
+          challengeCode: gameId
+        });
+      }
+    }
+
+    allGames = [...activeUserGames, ...allGames];
+
+    // Sort all games by date descending
+    allGames.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ games: allGames });
   } catch (error) {
     console.error("Error fetching games:", error);
     res.status(500).json({ error: "Failed to fetch games" });
+  }
+});
+
+/**
+ * GET /api/games/active
+ * Returns the gameId if the user is currently in an active Live PvP match.
+ */
+router.get("/active", async (req, res) => {
+  const { userId: clerkId } = getAuth(req);
+  if (!clerkId) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { clerkId } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    let activeGameId = null;
+    for (const [gameId, game] of activeGames.entries()) {
+      if (game.white.userId === user.id || game.black.userId === user.id) {
+        activeGameId = gameId;
+        break;
+      }
+    }
+
+    res.json({ activeGameId });
+  } catch (err) {
+    console.error("Error checking active games:", err);
+    res.status(500).json({ error: "Failed to check active games" });
   }
 });
 
@@ -267,10 +366,43 @@ router.get("/:id", async (req, res) => {
     const user = await prisma.user.findUnique({ where: { clerkId: userId } });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const game = await prisma.game.findFirst({
+    let game = await prisma.game.findFirst({
       where: { id: req.params.id, username: user.username },
     });
-    if (!game) return res.status(404).json({ error: "Game not found" });
+
+    if (game) {
+      game.isPvP = false;
+      return res.json({ game });
+    }
+
+    const pvpGame = await prisma.pvPGame.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { whiteUserId: user.id },
+          { blackUserId: user.id }
+        ]
+      },
+      include: {
+        white: { select: { username: true } },
+        black: { select: { username: true } }
+      }
+    });
+
+    if (!pvpGame) return res.status(404).json({ error: "Game not found" });
+
+    const isWhite = pvpGame.whiteUserId === user.id;
+    game = {
+      id: pvpGame.id,
+      isPvP: true,
+      moves: pvpGame.moves,
+      result: pvpGame.result,
+      playerColor: isWhite ? "white" : "black",
+      opponent: isWhite ? pvpGame.black.username : pvpGame.white.username,
+      totalMoves: pvpGame.totalMoves,
+      createdAt: pvpGame.createdAt,
+      difficulty: "PvP" // placeholder for replay viewer
+    };
 
     res.json({ game });
   } catch (error) {
@@ -278,5 +410,7 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch game" });
   }
 });
+
+
 
 export default router;

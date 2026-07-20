@@ -1,5 +1,6 @@
 import redis from "./redis.js";
 import prisma from "./prisma.js";
+import { onAiGameSaved } from "./postGameHooks.js";
 
 const INACTIVITY_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const CHECK_INTERVAL_MS = 60 * 1000; // check every 1 minute
@@ -33,7 +34,7 @@ export async function flushSessionToDb(sessionKey, endSession = true) {
         totalMoves: moves.length,
       };
 
-      await prisma.game.upsert({
+      const game = await prisma.game.upsert({
         where: { sessionId },
         update: { ...data, createdAt: new Date() },
         create: data,
@@ -41,6 +42,10 @@ export async function flushSessionToDb(sessionKey, endSession = true) {
 
       // Invalidate game history cache
       await redis.del(`user_games:${meta.username}`);
+
+      // Run post-game hooks asynchronously
+      const user = await prisma.user.findUnique({ where: { username: meta.username } });
+      if (user) onAiGameSaved(game.id, user.id);
 
       console.log(`[InactivityMonitor] Saved session ${sessionId} (${moves.length} moves)`);
     }

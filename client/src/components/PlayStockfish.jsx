@@ -6,6 +6,16 @@ import Chessboard from "./Chessboard";
 import { useStockfish, DIFFICULTIES } from "../hooks/useStockfish";
 import { trackEvent } from "../lib/analytics";
 import { startGameSession, cacheMove, flushGame } from "../lib/api";
+import Clock from "./Clock";
+import { useThemes } from "../hooks/useBoardTheme";
+
+const TIME_CONTROLS = [
+  { value: "1+0", label: "1 min (Blitz)" },
+  { value: "3+0", label: "3 min" },
+  { value: "5+0", label: "5 min" },
+  { value: "10+0", label: "10 min" },
+  { value: "unlimited", label: "Unlimited" }
+];
 
 export default function PlayStockfish({ 
   enableCaching = false, 
@@ -16,6 +26,7 @@ export default function PlayStockfish({
 }) {
   const { ready, error, requestBestMove, requestEvaluation, scoreCp, scoreMate } = useStockfish();
   const { isSignedIn } = useUser();
+  const { boardTheme, pieceSet } = useThemes();
   
   const gameRef = useRef(null);
   if (!gameRef.current) {
@@ -37,6 +48,11 @@ export default function PlayStockfish({
   const [engineTurn, setEngineTurn] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
   const [viewIndex, setViewIndex] = useState(null);
+
+  const [timeControl, setTimeControl] = useState("unlimited");
+  const [whiteTimeLeft, setWhiteTimeLeft] = useState(null);
+  const [blackTimeLeft, setBlackTimeLeft] = useState(null);
+  const [playerTimeout, setPlayerTimeout] = useState(false);
   
   // Track the initial state locally so we can clear it if the user hits "Reset"
   const activeInitialMovesRef = useRef(initialMoves);
@@ -145,7 +161,27 @@ export default function PlayStockfish({
       }
     }
     setEngineTurn(false);
-  }, [chess, difficulty, requestBestMove, useCaching]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chess, difficulty, requestBestMove, useCaching]); 
+
+  // Reset clocks
+  function resetClocks() {
+    setPlayerTimeout(false);
+    if (timeControl !== "unlimited") {
+      const parts = timeControl.split("+");
+      const baseMs = (parseInt(parts[0], 10) || 10) * 60 * 1000;
+      setWhiteTimeLeft(baseMs);
+      setBlackTimeLeft(baseMs);
+    } else {
+      setWhiteTimeLeft(null);
+      setBlackTimeLeft(null);
+    }
+  }
+
+  // Handle changing time control
+  const handleTimeControlChange = (tc) => {
+    setTimeControl(tc);
+    handleReset();
+  };
 
   function applyPlayerMove(from, to) {
     let move;
@@ -167,8 +203,8 @@ export default function PlayStockfish({
   }
 
   function handleSquareClick(sq) {
-    if (engineTurn || isDisplayedGameOver || !ready) return;
-    if (displayedChess.turn() !== "w") {
+    if (engineTurn || isDisplayedGameOver || !ready || playerTimeout) return;
+    if (displayedChess.turn() !== orientation.charAt(0)) {
       setSelected(null);
       return;
     }
@@ -203,11 +239,11 @@ export default function PlayStockfish({
   // Trigger the engine whenever it becomes Black's turn (engine plays Black).
   useEffect(() => {
     if (!ready) return;
-    if (chess.turn() === "b" && !chess.isGameOver()) {
+    if (chess.turn() === "b" && !chess.isGameOver() && !playerTimeout) {
       const t = setTimeout(requestEngineMove, 350);
       return () => clearTimeout(t);
     } 
-  }, [fen, ready, chess, requestEngineMove]);
+  }, [fen, ready, chess, requestEngineMove, playerTimeout]);
 
   // Trigger evaluation whenever displayedFEN changes
   useEffect(() => {
@@ -235,11 +271,14 @@ export default function PlayStockfish({
     
     setSaveStatus("saving");
     try {
-      const result = chess.isGameOver()
-        ? chess.isCheckmate()
+      let result = "abandoned";
+      if (playerTimeout) {
+        result = isPlayerWhite ? "black_win" : "white_win";
+      } else if (chess.isGameOver()) {
+        result = chess.isCheckmate()
           ? (chess.turn() === "w" ? "black_win" : "white_win")
-          : "draw"
-        : "abandoned";
+          : "draw";
+      }
       // Pass endSession = false because the user is just manually saving and can keep playing
       await flushGame(sessionIdRef.current, result, false);
       setSaveStatus("saved");
@@ -280,6 +319,7 @@ export default function PlayStockfish({
     setSelected(null);
     setHint(null);
     setViewIndex(null);
+    resetClocks();
     // Clear save status after a short delay for visual feedback
     setTimeout(() => setSaveStatus(null), 2000);
     trackEvent("play_reset");
@@ -305,10 +345,10 @@ export default function PlayStockfish({
         window.dispatchEvent(new Event("gameSaved"));
       })
       .catch(() => setSaveStatus("error"));
-  }, [isRealGameOver, useCaching, history, chess]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isRealGameOver, useCaching, history, chess]); 
 
   async function handleHint() {
-    if (engineTurn || isDisplayedGameOver || displayedChess.turn() !== "w") return;
+    if (engineTurn || isDisplayedGameOver || displayedChess.turn() !== orientation.charAt(0)) return;
     trackEvent("play_hint");
     evalSideRef.current = "w";
     const uci = await requestBestMove(displayedFen, { skill: 18, movetime: 500 });
@@ -317,6 +357,30 @@ export default function PlayStockfish({
       setTimeout(() => setHint(null), 2500);
     }
   }
+
+  const isPlayerWhite = orientation === "white";
+  const isPlayerTurn = chess.turn() === orientation.charAt(0);
+  
+  // Update clocks based on local interval when game is ongoing
+  useEffect(() => {
+    if (timeControl === "unlimited" || isDisplayedGameOver || playerTimeout) return;
+    
+    const interval = setInterval(() => {
+      if (engineTurn) return; // Only track player time for simplicity in AI games, or track AI too if we want
+      
+      const setTime = isPlayerWhite ? setWhiteTimeLeft : setBlackTimeLeft;
+      setTime(prev => {
+        if (prev === null) return prev;
+        const next = prev - 100;
+        if (next <= 0) {
+          setPlayerTimeout(true);
+          return 0;
+        }
+        return next;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [timeControl, engineTurn, isDisplayedGameOver, isPlayerWhite, playerTimeout]);
 
   const evalPawns = scoreMate !== null
     ? (scoreMate > 0 ? 99 : -99) * (evalSideRef.current === "w" ? 1 : -1)
@@ -384,19 +448,51 @@ export default function PlayStockfish({
                 </div>
               </div>
 
-              {/* Chessboard */}
-              <div className="flex-1 min-w-0">
-                <Chessboard
-                  board={board}
-                  interactive
-                  onSquareClick={handleSquareClick}
-                  selected={selected}
-                  legalTargets={legalTargets}
-                  lastMove={hint || lastMoveObj}
-                  checkSquare={checkSquare}
-                  orientation={orientation}
-                  ariaLabel="Interactive game against Stockfish"
-                />
+              {/* Chessboard & Clocks */}
+              <div className="flex-1 min-w-0 flex flex-col items-center">
+                <div className="w-full flex justify-between items-center mb-2 px-1">
+                  <span className="font-mono text-sm text-mist">Stockfish</span>
+                  {timeControl !== "unlimited" && (
+                    <Clock 
+                      timeMs={isPlayerWhite ? blackTimeLeft : whiteTimeLeft} 
+                      isRunning={!engineTurn && !playerTimeout && !isDisplayedGameOver} // don't animate stockfish time, since it moves instantly
+                    />
+                  )}
+                </div>
+                
+                <div className="w-full relative">
+                  <Chessboard
+                    board={board}
+                    interactive
+                    onSquareClick={handleSquareClick}
+                    selected={selected}
+                    legalTargets={legalTargets}
+                    lastMove={hint || lastMoveObj}
+                    checkSquare={checkSquare}
+                    orientation={orientation}
+                    ariaLabel="Interactive game against Stockfish"
+                    boardTheme={boardTheme}
+                    pieceTheme={pieceSet}
+                  />
+                  {playerTimeout && (
+                    <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center rounded-[4px] backdrop-blur-[2px]">
+                      <div className="bg-ink-2 p-6 rounded-2xl shadow-xl border border-red-500/30 text-center">
+                        <h3 className="text-3xl font-display font-bold text-red-400 mb-2">Timeout</h3>
+                        <p className="text-mist font-medium">You lost on time!</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full flex justify-between items-center mt-2 px-1">
+                  <span className="font-mono text-sm text-paper">You</span>
+                  {timeControl !== "unlimited" && (
+                    <Clock 
+                      timeMs={isPlayerWhite ? whiteTimeLeft : blackTimeLeft} 
+                      isRunning={isPlayerTurn && !playerTimeout && !isDisplayedGameOver} 
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -431,7 +527,7 @@ export default function PlayStockfish({
                   <button
                     key={d.level}
                     className={`flex-1 py-[9px] px-0 border-none border-r border-ink-3 cursor-pointer font-mono text-[0.85rem] last:border-r-0 ${i === difficultyIdx ? 'bg-violet text-white' : 'bg-transparent text-mist'}`}
-                    onClick={() => setDifficultyIdx(i)}
+                    onClick={() => { setDifficultyIdx(i); handleReset(); }}
                     aria-pressed={i === difficultyIdx}
                   >
                     {d.level}
@@ -439,9 +535,24 @@ export default function PlayStockfish({
                 ))}
               </div>
             </div>
+            
+            <div className="bg-ink-2 border border-ink-3 rounded-[14px] p-[16px]">
+              <p className="section-label">Time Control</p>
+              <div className="mt-[4px]">
+                <select 
+                  value={timeControl} 
+                  onChange={(e) => handleTimeControlChange(e.target.value)}
+                  className="w-full bg-ink-3 border border-line rounded-xl px-4 py-2 text-paper text-[0.95rem] font-medium focus:outline-none focus:border-violet transition-colors"
+                >
+                  {TIME_CONTROLS.map(tc => (
+                    <option key={tc.value} value={tc.value}>{tc.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-[10px]">
-              <button className="btn btn-ghost justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" onClick={handleHint} disabled={engineTurn || isDisplayedGameOver}>
+              <button className="btn btn-ghost justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" onClick={handleHint} disabled={engineTurn || isDisplayedGameOver || playerTimeout}>
                 <FiZap /> Hint
               </button>
               <button className="btn btn-ghost justify-center !py-[11px] !px-[10px] !text-[0.86rem] disabled:opacity-40 disabled:cursor-not-allowed" onClick={handleUndo} disabled={engineTurn || history.length === 0}>

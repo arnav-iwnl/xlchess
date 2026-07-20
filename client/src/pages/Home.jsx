@@ -1,12 +1,15 @@
 import { lazy, Suspense, useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUser, RedirectToSignIn } from "@clerk/clerk-react";
 import { FiZap, FiMenu, FiX, FiClock } from "react-icons/fi";
 
 const PlayStockfish = lazy(() => import("../components/PlayStockfish"));
+const PvPGame = lazy(() => import("../components/PvPGame"));
 const GameHistory = lazy(() => import("../components/GameHistory"));
 const Contact = lazy(() => import("../components/Contact"));
 const Footer = lazy(() => import("../components/Footer"));
 import { GameReplay } from "../components/GameHistory";
+import XPBar from "../components/XPBar";
 
 export default function Home() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -16,7 +19,33 @@ export default function Home() {
   );
   const [selectedGame, setSelectedGame] = useState(null);
   const [resumeState, setResumeState] = useState(null); // { initialMoves, initialDifficulty, initialOrientation }
+  const [gameMode, setGameMode] = useState("ai"); // "ai" | "pvp"
   const playRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.selectedGameId) {
+      import("../lib/api").then(m => m.getGameById(location.state.selectedGameId)).then(fullGame => {
+        if (fullGame.isPvP) {
+          setResumeState({
+            initialMoves: fullGame.moves,
+            initialDifficulty: "Intermediate",
+            initialOrientation: fullGame.playerColor,
+            resumeGameId: null
+          });
+          setGameMode("ai");
+          setSelectedGame(null);
+        } else {
+          setSelectedGame(fullGame);
+        }
+        scrollTo(playRef);
+      }).catch(e => console.error("Failed to load game", e));
+      
+      // Clear the state so it doesn't trigger again on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   useEffect(() => {
     const handleToggle = () => setSidebarOpen((prev) => !prev);
@@ -82,9 +111,24 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto w-full">
             <Suspense fallback={<div className="h-[400px]" />}>
               <GameHistory compact={true} onGameSelect={async (game) => {
+                if (game.result === "playing") {
+                  navigate(`/challenge/${game.challengeCode || game.id}`);
+                  return;
+                }
                 try {
                   const fullGame = await import("../lib/api").then(m => m.getGameById(game.id));
-                  setSelectedGame(fullGame);
+                  if (fullGame.isPvP) {
+                    setResumeState({
+                      initialMoves: fullGame.moves,
+                      initialDifficulty: "Intermediate",
+                      initialOrientation: fullGame.playerColor,
+                      resumeGameId: null
+                    });
+                    setGameMode("ai");
+                    setSelectedGame(null);
+                  } else {
+                    setSelectedGame(fullGame);
+                  }
                   if (window.innerWidth < 980) setSidebarOpen(false);
                   scrollTo(playRef);
                 } catch (e) {
@@ -101,22 +145,46 @@ export default function Home() {
         {/* Welcome Header */}
         <div className="pt-[89px] pb-[16px] flex-none">
           <div className="container max-w-[900px] mx-auto px-[24px]">
-            <h1 className="text-[clamp(1.6rem,4vw,2.6rem)] font-bold text-paper leading-[1.1]">
-              Welcome back,{" "}
-              <span className="bg-[linear-gradient(100deg,var(--color-violet-2),var(--color-violet))] bg-clip-text text-transparent">
-                {user.username || user.firstName || "Player"}
-              </span>
-            </h1>
-            <p className="mt-[12px] text-mist text-[0.92rem] max-w-[50ch]">
-              Ready for your next game? Play against Stockfish, track your progress, and review your past games from the sidebar.
-            </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h1 className="text-[clamp(1.6rem,4vw,2.6rem)] font-bold text-paper leading-[1.1]">
+                  Welcome back,{" "}
+                  <span className="bg-[linear-gradient(100deg,var(--color-violet-2),var(--color-violet))] bg-clip-text text-transparent">
+                    {user.username || user.firstName || "Player"}
+                  </span>
+                </h1>
+                <p className="mt-[12px] text-mist text-[0.92rem] max-w-[50ch]">
+                  Ready for your next game? Play against Stockfish, track your progress, and review your past games from the sidebar.
+                </p>
+              </div>
+              <div className="w-full md:w-[300px]">
+                <XPBar />
+              </div>
+            </div>
 
           </div>
         </div>
 
         {/* Play / Replay Section */}
         <div ref={playRef} className="flex-1 flex m-1 flex-col items-center">
-          <div className="w-full max-w-[900px] px-[24px]">
+          {!selectedGame && (
+            <div className="flex gap-2 mt-8 mb-4 bg-ink-2 p-1 rounded-lg border border-line/50">
+              <button 
+                onClick={() => setGameMode("ai")} 
+                className={`px-6 py-2 rounded-md text-sm font-bold transition-colors ${gameMode === "ai" ? "bg-violet-2 text-paper shadow-md" : "text-mist hover:text-paper"}`}
+              >
+                Play AI
+              </button>
+              <button 
+                onClick={() => setGameMode("pvp")} 
+                className={`px-6 py-2 rounded-md text-sm font-bold transition-colors ${gameMode === "pvp" ? "bg-violet-2 text-paper shadow-md" : "text-mist hover:text-paper"}`}
+              >
+                Live PvP
+              </button>
+            </div>
+          )}
+
+          <div className="w-full max-w-[900px] px-[24px] mb-32 min-h-[60vh]">
             <Suspense fallback={<div className="h-[800px]" />}>
               {selectedGame ? (
                 <GameReplay 
@@ -124,9 +192,12 @@ export default function Home() {
                   onBack={() => setSelectedGame(null)} 
                   onResume={(initialMoves, initialDifficulty, initialOrientation, resumeGameId) => {
                     setResumeState({ initialMoves, initialDifficulty, initialOrientation, resumeGameId });
+                    setGameMode("ai");
                     setSelectedGame(null); // close replay view
                   }}
                 />
+              ) : gameMode === "pvp" ? (
+                <PvPGame />
               ) : (
                 <PlayStockfish 
                   key={resumeState ? resumeState.initialMoves.length : 'default'}
