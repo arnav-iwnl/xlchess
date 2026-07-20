@@ -22,27 +22,7 @@ export default function App() {
   const [activeGameId, setActiveGameId] = useState(null);
   const [storeOpen, setStoreOpen] = useState(false);
 
-  useEffect(() => {
-    // Intercept subdomain referral (e.g. username.localhost:5173/referral)
-    const hostname = window.location.hostname;
-    const parts = hostname.split('.');
-    
-    if (
-      window.location.pathname === "/referral" && 
-      (
-        (parts.length >= 3 && parts[0] !== 'www') || 
-        (parts.length === 2 && parts[1] === 'localhost')
-      )
-    ) {
-      const username = parts[0];
-      const mainDomain = parts.slice(1).join('.');
-      const protocol = window.location.protocol;
-      const port = window.location.port ? `:${window.location.port}` : '';
-      
-      // Redirect to the main domain to ensure localStorage tracking works correctly
-      window.location.href = `${protocol}//${mainDomain}${port}/?signup=true&ref=${username}`;
-    }
-  }, []);
+
 
   useEffect(() => {
     if (isSignedIn) {

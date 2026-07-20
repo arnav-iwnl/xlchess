@@ -25,7 +25,7 @@ router.get("/code", async (req, res) => {
 
     res.json({
       code: user.username,
-      link: `${protocol}://${user.username}.${baseDomain}/referral`,
+      link: `${protocol}://${baseDomain}/?ref=${user.username}`,
       username: user.username,
     });
   } catch (error) {
